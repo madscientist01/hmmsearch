@@ -1,0 +1,122 @@
+
+<!DOCTYPE html>
+<html>
+	<head>
+    	<title>List</title>
+ 		<meta charset='utf-8'>
+	</head>
+	<script type="text/javascript" charset="utf8" src="test.js"></script>
+
+	<!-- DataTables CSS -->
+	<link rel="stylesheet" type="text/css" href="http://ajax.aspnetcdn.com/ajax/jquery.dataTables/1.9.4/css/jquery.dataTables.css">
+ 
+	<!-- jQuery -->
+	<script type="text/javascript" charset="utf8" src="http://ajax.aspnetcdn.com/ajax/jQuery/jquery-1.8.2.min.js"></script>
+ 
+	<!-- DataTables -->
+	<script type="text/javascript" charset="utf8" src="http://ajax.aspnetcdn.com/ajax/jquery.dataTables/1.9.4/jquery.dataTables.min.js"></script>
+	<script>
+
+	function drawBox(canvas,start,end,name,color) {
+		//
+		// Draw structural alignment in Canvas
+		//
+		var context=canvas.getContext("2d");
+		var x = 100;
+		var y = 100;
+		var aminoLength = 1700;
+		var xMarginLeft = 50;
+		var xMarginRight = 50;
+		var canvasWidth = canvas.width-xMarginLeft-xMarginRight;
+		var conversion = canvasWidth / aminoLength;
+		var barHeight = 30;
+		var length = end - start;
+		context.font = '14px sans-serif';
+		context.fillStyle = color;
+		context.strokeStyle = 'black';
+		context.lineWidth   = 1;
+		context.fillRect(xMarginLeft+start*conversion,y,length*conversion,barHeight);
+		context.strokeRect(xMarginLeft+start*conversion,y,length*conversion,barHeight);
+		context.fillStyle = 'black';
+		var textlength = context.measureText(name).width;
+		
+		if (length*conversion>2*textlength) {
+			context.font = '14px sans-serif';
+			context.fillText(name, xMarginLeft+(parseInt(start)+parseInt(length/3))*conversion, y+barHeight/1.5);
+		} else {
+			context.font = '12px sans-serif';
+			context.fillText(name, xMarginLeft+(parseInt(start)+parseInt(length/8))*conversion, y+barHeight/1.5);
+		}
+		// document.write(start+"</br>");
+		// document.write(end+"</br>");
+		// document.write(name+"</br>");
+	}
+
+	function drawLine(canvas,start,end) {
+		//
+		// Draw structural alignment in Canvas
+		//
+		var context=canvas.getContext("2d");
+		var x = 100;
+		var y = 100;
+		var aminoLength = 1700;
+		var xMarginLeft = 50;
+		var xMarginRight = 50;
+		var canvasWidth = canvas.width-xMarginLeft-xMarginRight;
+		var conversion = canvasWidth / aminoLength;
+		var barHeight = 30;
+		var length = end - start;
+		var lineWidth = 3;
+		context.lineWidth = lineWidth;
+		context.fillStyle = 'black';
+
+		context.beginPath();
+		context.moveTo(xMarginLeft+start*conversion,y+barHeight/2);
+		context.lineTo(xMarginLeft+end*conversion,y+barHeight/2);
+		context.stroke();
+	}
+
+
+		
+	$(document).ready(function(){
+		var canvas = document.getElementById('test');
+		var color = {'FH2':'red',
+					 'Drf_FH1':'blue'}; 
+
+		drawLine(canvas,0,1700)
+		for (i=0;i<data.length;i++) {			
+			drawBox(canvas,data[i].start, data[i].end, data[i].name, color[data[i].name]);
+		
+			
+				
+		}
+		
+	});
+	</script>
+
+	<style>
+	table{
+	    font-family: "Lucida Sans Unicode", "Lucida Grande", Sans-Serif;
+	    font-size: 11px;
+	    #margin: 45px;
+	    width:100%;
+	    text-align: left;
+	    border-collapse: collapse;  
+		}
+	div.head {
+		width:800px;
+		font-family: Sans-Serif;
+		font-size: 14px;
+		border:3px solid #EEEEEE;
+		border-radius: 10px;
+		padding: 10px;
+	    align :center;
+		background-color: #FFFFFF;
+		}		
+	</style>
+	<body>
+	
+			<canvas id="test" width="800" height="310"></canvas>
+		
+	</body>
+</html>
