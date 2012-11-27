@@ -1,5 +1,10 @@
 #!/usr/bin/python
-import urllib, urllib2,os,re
+#
+# Hmmer3 based Protein Domain Visualizer 
+#
+
+from __future__ import division
+import urllib, urllib2,os
 import xml.etree.ElementTree as ET
 import jsonpickle
 import argparse
@@ -38,8 +43,8 @@ class HmmerHit(object):
 		self.evalue=kwargs.get('evalue')
 		self.ievalue=kwargs.get('ievalue')
 		self.cevalue=kwargs.get('cevalue')
-		self.start = kwargs.get('start')
-		self.end=kwargs.get('end')
+		self.start = int(kwargs.get('start'))
+		self.end=int(kwargs.get('end'))
 		self.bitscore = kwargs.get('bitscore')
 
 # install a custom handler to prevent following of redirects automatically.
@@ -60,6 +65,9 @@ class Hmmer(object):
 		self.hits = []
 		
 	def run(self):
+		#
+		# Using Hmmscan in Hmmer3 web service, find locations of domains in the Fasta sequence and store 
+		#
 
 		opener = urllib2.build_opener(SmartRedirectHandler())
 		urllib2.install_opener(opener)
@@ -112,6 +120,93 @@ class Hmmer(object):
 		    print "Failed to retrieve results" 
 		    return(False)
 
+
+def drawSVG(hmmerResults, filename):
+	#
+	# Draw SVG based on the hmmer domaim
+	#
+	hmmcolors = {}
+	canvasHeight = 400
+	canvasWidth=1200
+	colors = ['aliceblue','antiquewhite','aqua','aquamarine','azure','beige','bisque','black','blanchedalmond','blue','blueviolet','brown','burlywood','cadetblue','chartreuse','chocolate','coral','cornflowerblue','cornsilk','crimson','cyan','darkblue','darkcyan','darkgoldenrod','darkgray','darkgreen','darkgrey','darkkhaki','darkmagenta','darkolivegreen','darkorange','darkorchid','darkred','darksalmon','darkseagreen','darkslateblue','darkslategray','darkslategrey','darkturquoise','darkviolet','deeppink','deepskyblue','dimgray','dimgrey','dodgerblue','firebrick','floralwhite','forestgreen','fuchsia','gainsboro','ghostwhite','gold','goldenrod','gray','grey','green','greenyellow','honeydew','hotpink','indianred','indigo','ivory','khaki','lavender','lavenderblush','lawngreen','lemonchiffon','lightblue','lightcoral','lightcyan','lightgoldenrodyellow','lightgray','lightgreen','lightgrey']
+	colorindex = 0
+	doc = ET.Element('svg', width=str(canvasWidth), height=str(canvasHeight), version='1.1', xmlns='http://www.w3.org/2000/svg')
+	x = 50
+	y = 50
+	leftmargin = 150
+	rightmargin = 100
+	fontsize = 16
+	effectiveWidth = canvasWidth -leftmargin - rightmargin
+	boxHeight = 20
+	maxLength = 0
+	for hmmer in hmmerResults:
+		if maxLength< hmmer.length:
+			maxLength= hmmer.length
+	#
+	# In Python 2.x, int division by int is int. but it became float in Python 3.*. 
+	#  from __future__ import division	was used 
+	#
+
+	conversion = effectiveWidth / maxLength
+
+	for hmmer in hmmerResults:
+		text = ET.Element('text', x=str(x), y=str(y), fill='black', 
+							style='font-family:Sans-Serif;font-size:16px;text-anchor:left;dominant-baseline:middle')
+ 		text.text = hmmer.name
+ 		doc.append(text)
+ 		line = ET.Element('line', x1=str(leftmargin), y1=str(y), x2=str(leftmargin+int(hmmer.length*conversion)),
+ 							 y2=str(y), style='stroke:rgb(200,200,200);stroke-width:4')
+ 		doc.append(line)
+ 		start = ET.Element('text', x=str(leftmargin-fontsize), y=str(y), fill='black', 
+							style='font-family:Sans-Serif;font-size:13px;text-anchor:right;dominant-baseline:middle')
+ 		start.text = '1'
+ 		doc.append(start)
+ 		end = ET.Element('text', x=str(leftmargin+int(hmmer.length*conversion)), y=str(y), fill='black', 
+							style='font-family:Sans-Serif;font-size:13px;text-anchor:left;dominant-baseline:middle')
+ 		end.text = str(hmmer.length)
+ 		doc.append(end)
+
+ 		for hit in hmmer.hits:
+ 			print hmmer.length, hit.start, hit.end
+ 			if hit.acc in hmmcolors:
+ 				color = hmmcolors[hit.acc]
+ 			else:
+ 				hmmcolors[hit.acc]=colors[colorindex]
+ 				color = colors[colorindex]
+ 				if colorindex < len(colors)-1:
+ 					colorindex+=1
+ 				else:
+ 					colorindex = 0
+
+ 			rect = ET.Element('rect', x=str(leftmargin+int(hit.start*conversion)), y=str(y-boxHeight/2),
+ 								 width=str(int((hit.end - hit.start)*conversion)), 
+ 								 height=str(boxHeight), style='fill:'+color+';stroke-width:1;stroke:black')
+
+ 			textLabel = ET.Element('text',x=str(leftmargin+int((hit.start+(hit.end-hit.start)*0.5)*conversion)),y=str(y),fill='black',
+ 									style='font-family:Sans-Serif;font-size:13px;text-anchor:middle;alignment-baseline:middle')
+ 			textLabel.text = hit.name
+ 			doc.append(rect)
+ 			doc.append(textLabel)
+ 			font=11
+ 			hitStart = ET.Element('text', x=str(leftmargin+int(hit.start*conversion)), y=str(y+boxHeight), fill='black', 
+							style='font-family:Sans-Serif;font-size:'+str(font)+'px;text-anchor:left;dominant-baseline:middle')
+	 		hitStart.text = str(hit.start)
+	 		doc.append(hitStart)
+	 		hitEnd = ET.Element('text', x=str(leftmargin+int(hit.end*conversion)-len(str(hit.end))*font*0.6), y=str(y+boxHeight), fill='black', 
+								style='font-family:Sans-Serif;font-size:'+str(font)+'px;text-anchor:right;dominant-baseline:middle')
+	 		hitEnd.text = str(hit.end)
+	 		doc.append(hitEnd)
+
+
+ 		y+=50
+ 	f = open(filename, 'w')
+	f.write('<?xml version=\"1.0\" standalone=\"no\"?>\n')
+	f.write('<!DOCTYPE svg PUBLIC \"-//W3C//DTD SVG 1.1//EN\"\n')
+	f.write('\"http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd\">\n')
+	f.write(ET.tostring(doc))
+	f.close()
+	return
+
 def main(argument):
 
 	if not argument.files:
@@ -126,14 +221,13 @@ def main(argument):
 			for hit in hmmer.hits:
 				print hmmer.name, hmmer.length, hit.name, hit.desc, hit.acc, hit.start, hit.end, hit.cevalue, hit.ievalue, hit.bitscore
 			hmmerResults.append(hmmer)
-
+	drawSVG(hmmerResults,"data.svg")
 	pickled = jsonpickle.encode(hmmerResults)
 	f=open("test.js","w")
 	f.write("var data="+pickled)
 	f.close()
 
 if __name__ == "__main__":
-
 
 	parser = argparse.ArgumentParser()
 	parser.add_argument('-f', '--fasta', nargs='+', dest='files',default=[],
