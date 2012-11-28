@@ -32,6 +32,33 @@ def readFasta(filename) :
 	else:
 		return()
 
+
+class DomainDefinition(object):
+
+	def __init__(self, **kwargs):
+		self.proteinName = kwargs.get('proteinName')
+		self.domainName = kwargs.get('domainName')
+		self.accession = kwargs.get('acession')
+		self.start = kwargs.get('start')
+		self.end = kwargs.get('end')
+		self.color = kwargs.get('color')
+		self.gradient = kwargs.get('gradient')
+		self.domainName2 = kwargs.get('domainName2')
+		#
+		# action = ['new','rename', 'remove']
+		#
+		self.action = kwargs.get('action')
+
+class colorDefinition(object):
+	def __init__(self, **kwargs):
+		self.domainName = kwargs.get('domainName')
+		self.accession = kwargs.get('acession')
+		self.color = kwargs.get('color')
+		self.gradient = kwargs.get('gradient')
+	
+
+
+
 class HmmerHit(object):
 	#
 	# Class for the Hmmer domain hits
@@ -46,6 +73,7 @@ class HmmerHit(object):
 		self.start = int(kwargs.get('start'))
 		self.end=int(kwargs.get('end'))
 		self.bitscore = kwargs.get('bitscore')
+		self.exclude = False;
 
 # install a custom handler to prevent following of redirects automatically.
 class SmartRedirectHandler(urllib2.HTTPRedirectHandler):
@@ -63,7 +91,36 @@ class Hmmer(object):
 		(self.name, self.sequence) = readFasta(self.file)
 		self.length=len(self.sequence)
 		self.hits = []
-		
+	
+	def exclude(self):
+
+		if len(self.hits)>1:
+
+			# for hit in self.hits:
+			# 	print hit.name, hit.start, hit.end, hit.bitscore, hit.exclude, "\n"
+
+
+			for i in range (len(self.hits)-1):			
+				for j in range (i+1,len(self.hits)):
+					# if (self.hits[i].acc == self.hits[j].acc and not self.hits[i].exclude and not self.hits[j].exclude):
+					if (not self.hits[i].exclude and not self.hits[j].exclude):	
+						if (self.hits[i].end > self.hits[j].start) and (self.hits[i].end<self.hits[j].end):
+							if (self.hits[i].bitscore > self.hits[j].bitscore):
+								self.hits[j].exclude= True			
+							else:
+								self.hits[i].exclude = True
+
+						if (self.hits[j].end > self.hits[i].start) and (self.hits[j].end<self.hits[i].end):
+							if (self.hits[i].bitscore > self.hits[j].bitscore):
+								self.hits[j].exclude= True			
+							else:
+								self.hits[i].exclude = True
+			
+
+			# for hit in self.hits:
+			# 	if not hit.exclude :
+			# 		print hit.name, hit.start, hit.end, hit.bitscore, hit.exclude, "\n"
+
 	def run(self):
 		#
 		# Using Hmmscan in Hmmer3 web service, find locations of domains in the Fasta sequence and store 
@@ -115,6 +172,8 @@ class Hmmer(object):
 										evalue=evalue, ievalue=ievalue, cevalue=cevalue, start=start, end=end)
 						self.hits.append(hit)
 
+			self.exclude()
+
 			return(True)
 		else:
 		    print "Failed to retrieve results" 
@@ -129,7 +188,7 @@ def drawSVG(hmmerResults, filename):
 	canvasHeight = 400
 	canvasWidth=1200
 	colors = ['aliceblue','antiquewhite','aqua','aquamarine','azure','beige','bisque','black','blanchedalmond','blue','blueviolet','brown','burlywood','cadetblue','chartreuse','chocolate','coral','cornflowerblue','cornsilk','crimson','cyan','darkblue','darkcyan','darkgoldenrod','darkgray','darkgreen','darkgrey','darkkhaki','darkmagenta','darkolivegreen','darkorange','darkorchid','darkred','darksalmon','darkseagreen','darkslateblue','darkslategray','darkslategrey','darkturquoise','darkviolet','deeppink','deepskyblue','dimgray','dimgrey','dodgerblue','firebrick','floralwhite','forestgreen','fuchsia','gainsboro','ghostwhite','gold','goldenrod','gray','grey','green','greenyellow','honeydew','hotpink','indianred','indigo','ivory','khaki','lavender','lavenderblush','lawngreen','lemonchiffon','lightblue','lightcoral','lightcyan','lightgoldenrodyellow','lightgray','lightgreen','lightgrey']
-	colorindex = 0
+	colorindex = 20
 	doc = ET.Element('svg', width=str(canvasWidth), height=str(canvasHeight), version='1.1', xmlns='http://www.w3.org/2000/svg')
 	x = 50
 	y = 50
@@ -167,38 +226,52 @@ def drawSVG(hmmerResults, filename):
  		doc.append(end)
 
  		for hit in hmmer.hits:
- 			print hmmer.length, hit.start, hit.end
- 			if hit.acc in hmmcolors:
- 				color = hmmcolors[hit.acc]
- 			else:
- 				hmmcolors[hit.acc]=colors[colorindex]
- 				color = colors[colorindex]
- 				if colorindex < len(colors)-1:
- 					colorindex+=1
- 				else:
- 					colorindex = 0
+ 			if not hit.exclude:
+	 			if hit.acc in hmmcolors:
+	 				color = hmmcolors[hit.acc]
+	 			else:
+	 				hmmcolors[hit.acc]=colors[colorindex]
+	 				color = colors[colorindex]
+	 				if colorindex < len(colors)-1:
+	 					colorindex+=1
+	 				else:
+	 					colorindex = 0
 
- 			rect = ET.Element('rect', x=str(leftmargin+int(hit.start*conversion)), y=str(y-boxHeight/2),
- 								 width=str(int((hit.end - hit.start)*conversion)), 
- 								 height=str(boxHeight), style='fill:'+color+';stroke-width:1;stroke:black')
+	 			rect = ET.Element('rect', x=str(leftmargin+int(hit.start*conversion)), y=str(y-boxHeight/2),
+	 								 width=str(int((hit.end - hit.start)*conversion)), 
+	 								 height=str(boxHeight), style='fill:'+color+';stroke-width:1;stroke:black')
 
- 			textLabel = ET.Element('text',x=str(leftmargin+int((hit.start+(hit.end-hit.start)*0.5)*conversion)),y=str(y),fill='black',
- 									style='font-family:Sans-Serif;font-size:13px;text-anchor:middle;alignment-baseline:middle')
- 			textLabel.text = hit.name
- 			doc.append(rect)
- 			doc.append(textLabel)
- 			font=11
- 			hitStart = ET.Element('text', x=str(leftmargin+int(hit.start*conversion)), y=str(y+boxHeight), fill='black', 
-							style='font-family:Sans-Serif;font-size:'+str(font)+'px;text-anchor:left;dominant-baseline:middle')
-	 		hitStart.text = str(hit.start)
-	 		doc.append(hitStart)
-	 		hitEnd = ET.Element('text', x=str(leftmargin+int(hit.end*conversion)-len(str(hit.end))*font*0.6), y=str(y+boxHeight), fill='black', 
-								style='font-family:Sans-Serif;font-size:'+str(font)+'px;text-anchor:right;dominant-baseline:middle')
-	 		hitEnd.text = str(hit.end)
-	 		doc.append(hitEnd)
+	 			font = 13
+	 			if (len(str(hit.name))*font*0.6>(hit.end - hit.start)*conversion):
+					delta = -1*boxHeight
+				else:
+					delta = 0
 
+	 			textLabel = ET.Element('text',x=str(leftmargin+int((hit.start+(hit.end-hit.start)*0.5)*conversion)),y=str(y+delta),fill='black',
+	 									style='font-family:Sans-Serif;font-size:'+str(font)+'px;text-anchor:middle;alignment-baseline:middle')
 
- 		y+=50
+	 			textLabel.text = hit.name
+	 			doc.append(rect)
+	 			doc.append(textLabel)
+	 			font=9
+
+	 			if (leftmargin+hit.start*conversion+font*0.6*(len(str(hit.start))))>(leftmargin+hit.end*conversion-len(str(hit.end))*font*0.6):
+	 				deltaStart = int(font*-0.5*len(str(hit.start)))
+	 				deltaEnd = int(font*0.5*len(str(hit.end)))
+	 			else:
+	 				deltaStart = 0
+	 				deltaEnd = 0
+	 			hitStart = ET.Element('text', x=str(leftmargin+int(hit.start*conversion)+deltaStart), y=str(y+boxHeight), fill='black', 
+								style='font-family:Sans-Serif;font-size:'+str(font)+'px;text-anchor:left;dominant-baseline:top')
+		 		hitStart.text = str(hit.start)
+		 		doc.append(hitStart)
+		 		hitEnd = ET.Element('text', x=str(leftmargin+int(hit.end*conversion)-len(str(hit.end))*font*0.6+deltaEnd), y=str(y+boxHeight), fill='black', 
+									style='font-family:Sans-Serif;font-size:'+str(font)+'px;text-anchor:right;dominant-baseline:top')
+		 		hitEnd.text = str(hit.end)
+		 		doc.append(hitEnd)
+
+ 		y+=60
+
  	f = open(filename, 'w')
 	f.write('<?xml version=\"1.0\" standalone=\"no\"?>\n')
 	f.write('<!DOCTYPE svg PUBLIC \"-//W3C//DTD SVG 1.1//EN\"\n')
