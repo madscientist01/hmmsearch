@@ -6,7 +6,6 @@
 from __future__ import division
 import urllib, urllib2,os
 import xml.etree.ElementTree as ET
-import jsonpickle
 import argparse
 import re
 import glob
@@ -295,10 +294,6 @@ def main(argument):
 				print hmmer.name, hmmer.length, hit.name, hit.desc, hit.acc, hit.start, hit.end, hit.cevalue, hit.ievalue, hit.bitscore
 			hmmerResults.append(hmmer)
 	drawSVG(hmmerResults,"data.svg")
-	pickled = jsonpickle.encode(hmmerResults)
-	f=open("test.js","w")
-	f.write("var data="+pickled)
-	f.close()
 
 if __name__ == "__main__":
 
