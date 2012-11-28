@@ -4,7 +4,9 @@
 #
 
 from __future__ import division
-import urllib, urllib2,os
+import urllib
+import urllib2
+import os
 import xml.etree.ElementTree as ET
 import argparse
 import re
@@ -31,6 +33,10 @@ def readFasta(filename) :
 	else:
 		return()
 
+def fetchfromUniprot(uniprotId):
+	print uniprotId
+	fileName = ""
+	return(fileName)
 
 class DomainDefinition(object):
 
@@ -40,15 +46,13 @@ class DomainDefinition(object):
 		self.accession = kwargs.get('acession')
 		self.start = kwargs.get('start')
 		self.end = kwargs.get('end')
-		self.color = kwargs.get('color')
-		self.gradient = kwargs.get('gradient')
 		self.domainName2 = kwargs.get('domainName2')
 		#
 		# action = ['new','rename', 'remove']
 		#
 		self.action = kwargs.get('action')
 
-class colorDefinition(object):
+class ColorDefinition(object):
 	def __init__(self, **kwargs):
 		self.domainName = kwargs.get('domainName')
 		self.accession = kwargs.get('acession')
@@ -56,7 +60,96 @@ class colorDefinition(object):
 		self.gradient = kwargs.get('gradient')
 	
 
+class InputFile(object):
 
+	def __init__(self, **kwargs):
+		self.domainDefinitions = []
+		self.colorDefinitions = []
+		self.inputFileName = kwargs.get('inputFileName')
+		self.fileNames = {}
+		self.searchDB = ""
+		self.outputFileName = ""
+		self.commands = {'FILE':'file','NEW':'new','RENAME':'rename','REMOVE':'remove', 'DOMAIN':'domain', 'SIZE':'size', 'EVALUE':'evalue', 'DB':'db'}
+
+	def file(self,content):
+		data = content.split()
+		uniprot = re.compile("uniprot:(\S+)")
+		if len(data)>1:
+			name = data[0]
+			fileName = data[1]
+			match = uniprot.match(fileName)
+			if match:
+				fileName = fetchfromUniprot(match.group(1))
+			if os.path.exists(fileName):
+				self.fileNames[name]=fileNames
+		return
+
+	def new(self,content):
+		data = content.split()
+		if len(data) > 3:
+			proteinName = data[0]
+			domainName = data[1]
+			if data[2] < data[3]:
+				start=data[2]
+				end = data[3]
+			else:
+				start=data[3]
+				end = data[2]
+
+			if len(data) > 4:
+				color = data[4]
+				colorDef = ColorDefinition(domainName=domainName, color=color)
+				self.colorDefinitions.append(colorDef)
+			if len(data) > 5:
+				colorDef.gradient = data[5]
+
+			domain = DomainDefinition(proteinName=proteinName, domainName=domainName, start=start, end=end)
+			self.domainDefinitions.append(domain)
+		return
+
+	def rename(self,content):
+		# print "RENAME"
+		# print content
+		return
+
+	def remove(self,content):
+		# print "REMOVE"
+		# print content
+		return
+
+
+	def domain(self,content):
+		# print "DOMAIN"
+		# print content
+		return
+
+	def readInputFile(self):
+		if os.path.exists(self.inputFileName):
+			f = open (self.inputFileName, 'r')
+			inputFileContent = f.readlines()
+
+			regex = re.compile("^(\S+)\s+(.*)$")
+			for line in inputFileContent:
+				if line[0:1] != "#":
+					match = regex.match(line)
+					if match:
+						keyword = match.group(1)
+						content = match.group(2)
+						if keyword in self.commands:
+							print keyword
+							process=getattr(self, self.commands[keyword])
+							process(content)
+
+			for domain in self.domainDefinitions:
+				print domain.proteinName, domain.domainName, domain.start, domain.end
+
+			for colorDef in self.colorDefinitions:
+				print colorDef.domainName, colorDef.color, colorDef.gradient
+			# 	print name,fileName
+
+			return(True)
+		else:
+			return(False)
 
 class HmmerHit(object):
 	#
@@ -105,21 +198,16 @@ class Hmmer(object):
 					if (not self.hits[i].exclude and not self.hits[j].exclude):	
 						if (self.hits[i].end > self.hits[j].start) and (self.hits[i].end<self.hits[j].end):
 							if (self.hits[i].bitscore > self.hits[j].bitscore):
-								self.hits[j].exclude= True			
+								self.hits[j].exclude = True			
 							else:
 								self.hits[i].exclude = True
 
 						if (self.hits[j].end > self.hits[i].start) and (self.hits[j].end<self.hits[i].end):
 							if (self.hits[i].bitscore > self.hits[j].bitscore):
-								self.hits[j].exclude= True			
+								self.hits[j].exclude = True			
 							else:
 								self.hits[i].exclude = True
 			
-
-			# for hit in self.hits:
-			# 	if not hit.exclude :
-			# 		print hit.name, hit.start, hit.end, hit.bitscore, hit.exclude, "\n"
-
 	def run(self):
 		#
 		# Using Hmmscan in Hmmer3 web service, find locations of domains in the Fasta sequence and store 
@@ -187,14 +275,14 @@ def drawSVG(hmmerResults, filename):
 	canvasHeight = 400
 	canvasWidth=1200
 	colors = ['aliceblue','antiquewhite','aqua','aquamarine','azure','beige','bisque','black','blanchedalmond','blue','blueviolet','brown','burlywood','cadetblue','chartreuse','chocolate','coral','cornflowerblue','cornsilk','crimson','cyan','darkblue','darkcyan','darkgoldenrod','darkgray','darkgreen','darkgrey','darkkhaki','darkmagenta','darkolivegreen','darkorange','darkorchid','darkred','darksalmon','darkseagreen','darkslateblue','darkslategray','darkslategrey','darkturquoise','darkviolet','deeppink','deepskyblue','dimgray','dimgrey','dodgerblue','firebrick','floralwhite','forestgreen','fuchsia','gainsboro','ghostwhite','gold','goldenrod','gray','grey','green','greenyellow','honeydew','hotpink','indianred','indigo','ivory','khaki','lavender','lavenderblush','lawngreen','lemonchiffon','lightblue','lightcoral','lightcyan','lightgoldenrodyellow','lightgray','lightgreen','lightgrey']
-	colorindex = 20
+	colorIndex = 10
 	doc = ET.Element('svg', width=str(canvasWidth), height=str(canvasHeight), version='1.1', xmlns='http://www.w3.org/2000/svg')
 	x = 50
 	y = 50
-	leftmargin = 150
-	rightmargin = 100
-	fontsize = 16
-	effectiveWidth = canvasWidth -leftmargin - rightmargin
+	leftMargin = 150
+	rightMargin = 100
+	fontSize = 16
+	effectiveWidth = canvasWidth -leftMargin - rightMargin
 	boxHeight = 20
 	maxLength = 0
 	for hmmer in hmmerResults:
@@ -212,14 +300,14 @@ def drawSVG(hmmerResults, filename):
 							style='font-family:Sans-Serif;font-size:16px;text-anchor:left;dominant-baseline:middle')
  		text.text = hmmer.name
  		doc.append(text)
- 		line = ET.Element('line', x1=str(leftmargin), y1=str(y), x2=str(leftmargin+int(hmmer.length*conversion)),
+ 		line = ET.Element('line', x1=str(leftMargin), y1=str(y), x2=str(leftMargin+int(hmmer.length*conversion)),
  							 y2=str(y), style='stroke:rgb(200,200,200);stroke-width:4')
  		doc.append(line)
- 		start = ET.Element('text', x=str(leftmargin-fontsize), y=str(y), fill='black', 
+ 		start = ET.Element('text', x=str(leftMargin-fontSize), y=str(y), fill='black', 
 							style='font-family:Sans-Serif;font-size:13px;text-anchor:right;dominant-baseline:middle')
  		start.text = '1'
  		doc.append(start)
- 		end = ET.Element('text', x=str(leftmargin+int(hmmer.length*conversion)), y=str(y), fill='black', 
+ 		end = ET.Element('text', x=str(leftMargin+int(hmmer.length*conversion)), y=str(y), fill='black', 
 							style='font-family:Sans-Serif;font-size:13px;text-anchor:left;dominant-baseline:middle')
  		end.text = str(hmmer.length)
  		doc.append(end)
@@ -229,14 +317,14 @@ def drawSVG(hmmerResults, filename):
 	 			if hit.acc in hmmcolors:
 	 				color = hmmcolors[hit.acc]
 	 			else:
-	 				hmmcolors[hit.acc]=colors[colorindex]
-	 				color = colors[colorindex]
-	 				if colorindex < len(colors)-1:
-	 					colorindex+=1
+	 				hmmcolors[hit.acc]=colors[colorIndex]
+	 				color = colors[colorIndex]
+	 				if colorIndex < len(colors)-1:
+	 					colorIndex+=1
 	 				else:
-	 					colorindex = 0
+	 					colorIndex = 0
 
-	 			rect = ET.Element('rect', x=str(leftmargin+int(hit.start*conversion)), y=str(y-boxHeight/2),
+	 			rect = ET.Element('rect', x=str(leftMargin+int(hit.start*conversion)), y=str(y-boxHeight/2),
 	 								 width=str(int((hit.end - hit.start)*conversion)), 
 	 								 height=str(boxHeight), style='fill:'+color+';stroke-width:1;stroke:black')
 
@@ -246,7 +334,7 @@ def drawSVG(hmmerResults, filename):
 				else:
 					delta = 0
 
-	 			textLabel = ET.Element('text',x=str(leftmargin+int((hit.start+(hit.end-hit.start)*0.5)*conversion)),y=str(y+delta),fill='black',
+	 			textLabel = ET.Element('text',x=str(leftMargin+int((hit.start+(hit.end-hit.start)*0.5)*conversion)),y=str(y+delta),fill='black',
 	 									style='font-family:Sans-Serif;font-size:'+str(font)+'px;text-anchor:middle;alignment-baseline:middle')
 
 	 			textLabel.text = hit.name
@@ -254,17 +342,17 @@ def drawSVG(hmmerResults, filename):
 	 			doc.append(textLabel)
 	 			font=9
 
-	 			if (leftmargin+hit.start*conversion+font*0.6*(len(str(hit.start))))>(leftmargin+hit.end*conversion-len(str(hit.end))*font*0.6):
+	 			if (leftMargin+hit.start*conversion+font*0.6*(len(str(hit.start))))>(leftMargin+hit.end*conversion-len(str(hit.end))*font*0.6):
 	 				deltaStart = int(font*-0.5*len(str(hit.start)))
 	 				deltaEnd = int(font*0.5*len(str(hit.end)))
 	 			else:
 	 				deltaStart = 0
 	 				deltaEnd = 0
-	 			hitStart = ET.Element('text', x=str(leftmargin+int(hit.start*conversion)+deltaStart), y=str(y+boxHeight), fill='black', 
+	 			hitStart = ET.Element('text', x=str(leftMargin+int(hit.start*conversion)+deltaStart), y=str(y+boxHeight), fill='black', 
 								style='font-family:Sans-Serif;font-size:'+str(font)+'px;text-anchor:left;dominant-baseline:top')
 		 		hitStart.text = str(hit.start)
 		 		doc.append(hitStart)
-		 		hitEnd = ET.Element('text', x=str(leftmargin+int(hit.end*conversion)-len(str(hit.end))*font*0.6+deltaEnd), y=str(y+boxHeight), fill='black', 
+		 		hitEnd = ET.Element('text', x=str(leftMargin+int(hit.end*conversion)-len(str(hit.end))*font*0.6+deltaEnd), y=str(y+boxHeight), fill='black', 
 									style='font-family:Sans-Serif;font-size:'+str(font)+'px;text-anchor:right;dominant-baseline:top')
 		 		hitEnd.text = str(hit.end)
 		 		doc.append(hitEnd)
@@ -297,13 +385,16 @@ def main(argument):
 
 if __name__ == "__main__":
 
-	parser = argparse.ArgumentParser()
-	parser.add_argument('-f', '--fasta', nargs='+', dest='files',default=[],
-	                    help='Files to process')
-	parser.add_argument('-d', '--database', dest='db',default='pfam',
-						help='HMM database')
-	parser.add_argument('-e', '--evalue_cutoff', dest='evalue',default=1e-5,
-						help='E-value cutoff')
-	results = parser.parse_args()
-	main(results)
+	inputFile = InputFile(inputFileName='hmmer.inp')
+	inputFile.readInputFile()
+
+	# parser = argparse.ArgumentParser()
+	# parser.add_argument('-f', '--fasta', nargs='+', dest='files',default=[],
+	#                     help='Files to process')
+	# parser.add_argument('-d', '--database', dest='db',default='pfam',
+	# 					help='HMM database')
+	# parser.add_argument('-e', '--evalue_cutoff', dest='evalue',default=1e-5,
+	# 					help='E-value cutoff')
+	# results = parser.parse_args()
+	# main(results)
 
