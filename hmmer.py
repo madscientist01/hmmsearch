@@ -11,6 +11,7 @@ import xml.etree.ElementTree as ET
 import argparse
 import re
 import glob
+import subprocess
 
 def readFasta(filename) :
 	#
@@ -34,8 +35,26 @@ def readFasta(filename) :
 		return()
 
 def fetchfromUniprot(uniprotId):
-	print uniprotId
-	fileName = ""
+	#
+	# fetch fasta file using Rest interface of uniprot 
+	#  http://www.uniprot.org/faq/28
+	#
+	uniprotURL = "http://www.uniprot.org/uniprot/{0}.fasta".format(uniprotId)
+	fileName = uniprotId+".fasta"
+	try:
+		req = urllib2.Request(uniprotURL)
+		u = urllib2.urlopen(req)
+		sequence = u.read()
+		fileName = uniprotId+".fasta"
+		f = open(fileName,'w')
+		f.write(sequence)
+		f.close()
+		return(fileName)
+
+	except urllib2.URLError, e:
+		print "{0} is not valid uniprot id".format(uniprotId)
+    	return(None)
+
 	return(fileName)
 
 class DomainDefinition(object):
@@ -81,8 +100,10 @@ class InputFile(object):
 			match = uniprot.match(fileName)
 			if match:
 				fileName = fetchfromUniprot(match.group(1))
-			if os.path.exists(fileName):
-				self.fileNames[fileName]=name
+			if fileName:
+				if os.path.exists(fileName):
+					print fileName,name
+					self.fileNames[fileName]=name
 		return
 
 	def new(self,content):
@@ -208,6 +229,7 @@ class Hmmer(object):
 		self.file=kwargs.get('file')
 		self.db=kwargs.get('db')
 		self.cutoff=kwargs.get('evalue')
+		self.localHmmDB = kwargs.get('localHmmDB')
 		(self.name, self.sequence) = readFasta(self.file)
 		self.length=len(self.sequence)
 		self.hits = []
@@ -235,11 +257,10 @@ class Hmmer(object):
 							else:
 								self.hits[i].exclude = True
 			
-	def run(self):
+	def runRemote(self):
 		#
 		# Using Hmmscan in Hmmer3 web service, find locations of domains in the Fasta sequence and store 
 		#
-
 		opener = urllib2.build_opener(SmartRedirectHandler())
 		urllib2.install_opener(opener)
 		print self.name
@@ -268,6 +289,9 @@ class Hmmer(object):
 			#
 			# Parse using ElementTree Modules (http://docs.python.org/2/library/xml.etree.elementtree.html)
 			#
+			f=open(self.file+".xml", "w")
+			f.write(result)
+			f.close()
 			root = ET.fromstring(result)
 			for child in root.iter('hits'):
 				name = child.get('name')
@@ -287,11 +311,52 @@ class Hmmer(object):
 						self.hits.append(hit)
 
 			self.exclude()
-
 			return(True)
 		else:
-		    print "Failed to retrieve results" 
-		    return(False)
+			print "Failed to retrieve results" 
+			return(False)
+
+	def runLocal(self):
+			#
+			# Using Hmmscan in Hmmer3 web service, find locations of domains in the Fasta sequence and store 
+			#
+		if os.path.exists(self.db):
+			outputFile = self.file+".tb"
+			hmmeroutFile = self.file+".hmmer"
+			print "Processing {0}".format(self.file)
+			p = subprocess.Popen(['hmmscan','--domtblout',outputFile,'--cut_ga',self.db, self.file],stdout=subprocess.PIPE)
+			p_stdout = p.stdout.read()
+			fw = open(hmmeroutFile,'w')
+			fw.write(p_stdout)
+			fw.close()
+
+			f = open(outputFile,'r')
+			data = f.readlines()
+			f.close()
+			
+			for line in data:
+				if line[0:1] != "#":
+					splited = line.split()
+					
+					if (float(splited[12])<float(self.cutoff)):
+						cevalue = splited[11]
+						ievalue = splited[12]
+						start = splited[17]
+						end = splited[18]
+						bitscore = splited[7]
+						acc = splited[1]
+						desc = line[181:202]
+						evalue = splited[6]
+						name = splited[0]
+						hit = HmmerHit(	name=name, desc=desc, acc=acc,bitscore=bitscore,
+										evalue=evalue, ievalue=ievalue, cevalue=cevalue, start=start, end=end)
+						self.hits.append(hit)
+
+			self.exclude()			
+			return(True)
+		else:
+			print "{0} file is not exist".format(self.db) 
+			return(False)
 
 
 def drawSVG(hmmerResults, filename):
@@ -425,7 +490,9 @@ def drawSVG(hmmerResults, filename):
 	return
 
 def processHmmerResults(hmmerResults, inputFile):
-
+#
+# inject information of input file into hmmerResults 
+#
 	colors = ['aliceblue','antiquewhite', 'aqua', 'aquamarine', 'azure', 'beige', 'bisque', 'black', 'blanchedalmond', 
 			'blue', 'blueviolet', 'brown', 'burlywood', 'cadetblue', 'chartreuse', 'chocolate', 'coral', 
 			'cornflowerblue', 'cornsilk', 'crimson', 'cyan', 'darkblue', 'darkcyan', 'darkgoldenrod', 'darkgray', 
@@ -505,7 +572,6 @@ def processHmmerResults(hmmerResults, inputFile):
 					hit.startshow = startshow
 					hit.endshow = endshow
 
-
 	return hmmerResults
 
 
@@ -521,10 +587,16 @@ def main(argument,inputFile):
 	hmmerResults=[]
 	for file in files:
 		hmmer = Hmmer(file=file,db=argument.db,evalue=argument.evalue)
-		if hmmer.run():
-			for hit in hmmer.hits:
-				print hmmer.name, hmmer.length, hit.name, hit.desc, hit.acc, hit.start, hit.end, hit.cevalue, hit.ievalue, hit.bitscore
-			hmmerResults.append(hmmer)
+		if argument.local:
+			if hmmer.runLocal():
+				for hit in hmmer.hits:
+					print hmmer.name, hmmer.length, hit.name, hit.desc, hit.acc, hit.start, hit.end, hit.cevalue, hit.ievalue, hit.bitscore
+				hmmerResults.append(hmmer)	
+		else:	
+			if hmmer.runRemote():
+				for hit in hmmer.hits:
+					print hmmer.name, hmmer.length, hit.name, hit.desc, hit.acc, hit.start, hit.end, hit.cevalue, hit.ievalue, hit.bitscore
+				hmmerResults.append(hmmer)
 
 	newHmmerResults = processHmmerResults(hmmerResults,inputFile)		
 	drawSVG(newHmmerResults,"data.svg")
@@ -541,6 +613,8 @@ if __name__ == "__main__":
 						help='HMM database')
 	parser.add_argument('-e', '--evalue_cutoff', dest='evalue',default=1e-5,
 						help='E-value cutoff')
+	parser.add_argument('-l', '--local',action='store_true', dest='local', default=False, 
+						help='run local Hmmer')
 	results = parser.parse_args()
 	main(results,inputFile)
 
