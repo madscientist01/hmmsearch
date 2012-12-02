@@ -11,6 +11,7 @@ import xml.etree.ElementTree as ET
 import argparse
 import re
 import glob
+import sys
 import subprocess
 
 def readFasta(filename) :
@@ -32,7 +33,7 @@ def readFasta(filename) :
 				sequence = sequence+line			
 		return(sequenceName,sequence)	    	
 	else:
-		return()
+		return(None)
 
 def fetchfromUniprot(uniprotId):
 	#
@@ -51,7 +52,7 @@ def fetchfromUniprot(uniprotId):
 		f.close()
 		return(fileName)
 
-	except urllib2.URLError, e:
+	except urllib2.URLError:
 		print "{0} is not valid uniprot id".format(uniprotId)
     	return(None)
 
@@ -80,13 +81,16 @@ class RenameDefinition(object):
 		self.newName = kwargs.get('newName')
 
 class InputFile(object):
-
+	#
+	# Input File (Hmmer.INP) processing class
+	#
 	def __init__(self, **kwargs):
 		self.domainDefinitions = []
 		self.colorDefinitions = []
 		self.renameDefinitions = []
 		self.inputFileName = kwargs.get('inputFileName')
-		self.fileNames = {}
+		self.fileNames = []
+		self.proteinNames = []
 		self.searchDB = ""
 		self.outputFileName = ""
 		self.commands = {'FILE':'file','NEW':'new','RENAME':'rename','REMOVE':'remove', 'COLOR':'color', 'SIZE':'size', 'EVALUE':'evalue', 'DB':'db'}
@@ -103,7 +107,8 @@ class InputFile(object):
 			if fileName:
 				if os.path.exists(fileName):
 					print fileName,name
-					self.fileNames[fileName]=name
+					self.fileNames.append(fileName)
+					self.proteinNames.append(name)
 		return
 
 	def new(self,content):
@@ -161,7 +166,6 @@ class InputFile(object):
 			domain = DomainDefinition(proteinName=proteinName, domainName=domainName, start=start, end=end, action='remove')
 			self.domainDefinitions.append(domain)
 		return
-
 
 	def color(self,content):
 		data = content.split()
@@ -317,13 +321,16 @@ class Hmmer(object):
 			return(False)
 
 	def runLocal(self):
-			#
-			# Using Hmmscan in Hmmer3 web service, find locations of domains in the Fasta sequence and store 
-			#
+		#
+		# Using Hmmscan in locally installed Hmmer3 packages, find locations of domains in the Fasta sequence and store 
+		#
 		if os.path.exists(self.db):
 			outputFile = self.file+".tb"
 			hmmeroutFile = self.file+".hmmer"
 			print "Processing {0}".format(self.file)
+			#
+			# hmmscan --domtbout outputFile --cut_ga, DBfile, queryFile
+			#
 			p = subprocess.Popen(['hmmscan','--domtblout',outputFile,'--cut_ga',self.db, self.file],stdout=subprocess.PIPE)
 			p_stdout = p.stdout.read()
 			fw = open(hmmeroutFile,'w')
@@ -355,7 +362,8 @@ class Hmmer(object):
 			self.exclude()			
 			return(True)
 		else:
-			print "{0} file is not exist".format(self.db) 
+			print "{0} file is not exist".format(self.db)
+			sys.exit() 
 			return(False)
 
 
@@ -364,7 +372,7 @@ def drawSVG(hmmerResults, filename):
 	# Draw SVG based on the hmmer domaim
 	#
 	hmmcolors = {}
-	canvasHeight = 400
+	canvasHeight = len(hmmerResults)*60+100
 	canvasWidth=1200
 	colors = ['aliceblue','antiquewhite', 'aqua', 'aquamarine', 'azure', 'beige', 'bisque', 'black', 'blanchedalmond', 
 			'blue', 'blueviolet', 'brown', 'burlywood', 'cadetblue', 'chartreuse', 'chocolate', 'coral', 
@@ -386,7 +394,30 @@ def drawSVG(hmmerResults, filename):
 	     	'slategray', 'slategrey', 'snow', 'springgreen', 'steelblue', 'tan', 'teal', 'thistle', 
 	     	'tomato', 'turquoise', 'violet', 'wheat', 'white', 'whitesmoke', 'yellow', 'yellowgreen']
 	colorIndex = 10
+
+	gradientid = "test"
 	doc = ET.Element('svg', width=str(canvasWidth), height=str(canvasHeight), version='1.1', xmlns='http://www.w3.org/2000/svg')
+	defs = ET.Element('defs')
+	gradientList = []
+	for hmmerResult in hmmerResults:
+		for hit in hmmerResult.hits:
+			if hit.gradient:
+				if not hit.color in gradientList:
+					gradientid = "gradient_"+hit.color
+					gradientList.append(gradientid)
+					gradient = ET.Element('linearGradient', id=gradientid, x1="0%",y1="-20%",x2="0%",y2="120%")
+					stop1 = ET.Element('stop', offset="0%", style="stop-color:white;stop-opacity:1")
+					stop2 = ET.Element('stop', offset="40%", style="stop-color:"+hit.color+";stop-opacity:1")
+					stop3 = ET.Element('stop', offset="60%", style="stop-color:"+hit.color+";stop-opacity:1")					
+					stop4 = ET.Element('stop', offset="100%", style="stop-color:white;stop-opacity:1")
+					gradient.append(stop1)
+					gradient.append(stop2)
+					gradient.append(stop3)
+					gradient.append(stop4)	
+					defs.append(gradient)
+
+	doc.append(defs)
+
 	x = 50
 	y = 50
 	leftMargin = 150
@@ -442,10 +473,15 @@ def drawSVG(hmmerResults, filename):
 		 			border = ';stroke-width:1;stroke:black'
 		 		else:
 		 			border = ''
-
+		 		if hit.gradient:
+		 			style='fill:url(#'+'gradient_'+hit.color+')'+border
+		 		else:
+		 			style = 'fill:'+color+border
+	 			
 	 			rect = ET.Element('rect', x=str(leftMargin+int(hit.start*conversion)), y=str(y-boxHeight/2),
 	 								 width=str(int((hit.end - hit.start)*conversion)), 
-	 								 height=str(boxHeight), style='fill:'+color+border)
+	 								 height=str(boxHeight), style=style)
+
 	 			doc.append(rect)
 	 			if hit.label:
 		 			font = 13
@@ -513,19 +549,19 @@ def processHmmerResults(hmmerResults, inputFile):
 	     	'slategray', 'slategrey', 'snow', 'springgreen', 'steelblue', 'tan', 'teal', 'thistle', 
 	     	'tomato', 'turquoise', 'violet', 'wheat', 'white', 'whitesmoke', 'yellow', 'yellowgreen']
 
-	for (filename,name) in inputFile.fileNames.items():
+	for i in range(len(inputFile.fileNames)):
 		for hmmerResult in hmmerResults:
-			if hmmerResult.file == filename:
-				hmmerResult.name = name
+			if hmmerResult.file == inputFile.fileNames[i]:
+				hmmerResult.name = inputFile.proteinNames[i]
 
 	for domain in inputFile.domainDefinitions:
 		for hmmerResult in hmmerResults:
 			if (domain.proteinName == hmmerResult.name):
 				if domain.action == 'remove':
 					for hit in hmmerResult.hits:
-						print hit.name, domain.domainName, hit.start, domain.start, hit.end, domain.end
+					#	print hit.name, domain.domainName, hit.start, domain.start, hit.end, domain.end
 						if (hit.name == domain.domainName) and (hit.start == domain.start) and (hit.end == domain.end):
-							print "excluded"
+					#		print "excluded"
 							hit.exclude = True	
 				if domain.action == 'new':
 					pseudoHit = HmmerHit(name=domain.domainName, start=domain.start, end=domain.end)
@@ -578,7 +614,7 @@ def processHmmerResults(hmmerResults, inputFile):
 def main(argument,inputFile):
 
 	if len(inputFile.fileNames)>0:
-		files = inputFile.fileNames.keys()
+		files = inputFile.fileNames
 	elif not argument.files:
 		files = glob.glob('*.fasta')
 	else:
@@ -589,17 +625,13 @@ def main(argument,inputFile):
 		hmmer = Hmmer(file=file,db=argument.db,evalue=argument.evalue)
 		if argument.local:
 			if hmmer.runLocal():
-				for hit in hmmer.hits:
-					print hmmer.name, hmmer.length, hit.name, hit.desc, hit.acc, hit.start, hit.end, hit.cevalue, hit.ievalue, hit.bitscore
 				hmmerResults.append(hmmer)	
 		else:	
 			if hmmer.runRemote():
-				for hit in hmmer.hits:
-					print hmmer.name, hmmer.length, hit.name, hit.desc, hit.acc, hit.start, hit.end, hit.cevalue, hit.ievalue, hit.bitscore
 				hmmerResults.append(hmmer)
-
-	newHmmerResults = processHmmerResults(hmmerResults,inputFile)		
-	drawSVG(newHmmerResults,"data.svg")
+	if len(hmmerResults)>0:
+		newHmmerResults = processHmmerResults(hmmerResults,inputFile)		
+		drawSVG(newHmmerResults,argument.outputfile)
 
 if __name__ == "__main__":
 
@@ -615,6 +647,8 @@ if __name__ == "__main__":
 						help='E-value cutoff')
 	parser.add_argument('-l', '--local',action='store_true', dest='local', default=False, 
 						help='run local Hmmer')
+	parser.add_argument('-o', '--output', dest='outputfile', default='output.svg', 
+						help='Output svg filename')
 	results = parser.parse_args()
 	main(results,inputFile)
 
