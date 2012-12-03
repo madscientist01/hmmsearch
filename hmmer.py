@@ -184,7 +184,6 @@ class InputFile(object):
 		if os.path.exists(self.inputFileName):
 			f = open (self.inputFileName, 'r')
 			inputFileContent = f.readlines()
-
 			regex = re.compile("^(\S+)\s+(.*)$")
 			for line in inputFileContent:
 				if line[0:1] != "#":
@@ -195,7 +194,6 @@ class InputFile(object):
 						if keyword in self.commands:
 							process=getattr(self, self.commands[keyword])
 							process(content)
-
 			return(True)
 		else:
 			return(False)
@@ -238,6 +236,7 @@ class Hmmer(object):
 		self.db=kwargs.get('db')
 		self.cutoff=kwargs.get('evalue')
 		self.localHmmDB = kwargs.get('localHmmDB')
+		self.threshold = kwargs.get('threshold')
 		(self.name, self.sequence) = readFasta(self.file)
 		self.length=len(self.sequence)
 		self.hits = []
@@ -275,8 +274,14 @@ class Hmmer(object):
 		opener = urllib2.build_opener(SmartRedirectHandler())
 		urllib2.install_opener(opener)
 		print self.name
+		if not self.db in ['pfam','superfamily','tigrfam', 'gene3d']:
+			print "{0} is not valid db. It should be pfam, superfamily, tigrfam or gene3d."
+			print "search will be carried out with pfam"
+			self.db = 'pfam'
+
 		parameters = {
 		              'hmmdb':self.db,
+		              'threshold':self.threshold,
 		              'seq':self.sequence
 		             }
 		enc_params = urllib.urlencode(parameters);
@@ -305,12 +310,14 @@ class Hmmer(object):
 			f.close()
 			root = ET.fromstring(result)
 			for child in root.iter('hits'):
+			
 				name = child.get('name')
 				desc = child.get('desc')
 				acc = child.get('acc')
-				evalue=child.get('evalue')
-				
+				evalue=child.get('evalue')				
+			
 				for element in child.iter('domains'):
+			
 					if (float(element.get('ievalue'))<float(self.cutoff)):
 						cevalue = element.get('cevalue')
 						ievalue = element.get('ievalue')
@@ -338,7 +345,11 @@ class Hmmer(object):
 			#
 			# hmmscan --domtbout outputFile --cut_ga, DBfile, queryFile
 			#
-			p = subprocess.Popen(['hmmscan','--domtblout',outputFile,'--cut_ga',self.db, self.file],stdout=subprocess.PIPE)
+			if self.threshold=='cut_ga':
+				p = subprocess.Popen(['hmmscan','--domtblout',outputFile,'--cut_ga',self.db, self.file],stdout=subprocess.PIPE)
+			else:
+				p = subprocess.Popen(['hmmscan','--domtblout',outputFile,self.db, self.file],stdout=subprocess.PIPE)
+			
 			p_stdout = p.stdout.read()
 			fw = open(hmmeroutFile,'w')
 			fw.write(p_stdout)
@@ -441,7 +452,6 @@ def drawSVG(hmmerResults, filename):
 	# In Python 2.x, int division by int is int. but it became float in Python 3.*. 
 	#  from __future__ import division	was used 
 	#
-
 	conversion = effectiveWidth / maxLength
 
 	for hmmer in hmmerResults:
@@ -475,7 +485,7 @@ def drawSVG(hmmerResults, filename):
 		 			if hit.name in hmmcolors:
 		 				color = hmmcolors[hit.name]
 		 			else:
-		 				hmmcolors[hit.acc]=colors[colorIndex]
+		 				hmmcolors[hit.name]=colors[colorIndex]
 		 				color = colors[colorIndex]
 		 				if colorIndex < len(colors)-1:
 		 					colorIndex+=1
@@ -643,8 +653,12 @@ def main(argument,inputFile):
 		files =argument.files
 
 	hmmerResults=[]
+	if argument.threshold:
+		threshold = "cut_ga"
+	else:
+		threshold = "No"
 	for file in files:
-		hmmer = Hmmer(file=file,db=argument.db,evalue=argument.evalue)
+		hmmer = Hmmer(file=file,db=argument.db,evalue=argument.evalue,threshold=threshold)
 		if argument.local:
 			if hmmer.runLocal():
 				hmmerResults.append(hmmer)	
@@ -671,6 +685,8 @@ if __name__ == "__main__":
 						help='run local Hmmer')
 	parser.add_argument('-o', '--output', dest='outputfile', default='output.svg', 
 						help='Output svg filename')
+	parser.add_argument('-t', '--no_threshold', dest='threshold',action='store_false', default=True,
+						help='Turn of Pfam gathering threshold. Enable to look up more weak(unreliable) domains')
 	results = parser.parse_args()
 	main(results,inputFile)
 
