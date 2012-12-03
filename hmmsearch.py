@@ -25,7 +25,7 @@ def extractMultiFasta(multifasta,searchId):
 	buffer=[]
 	f=open(multifasta)
 	header = re.compile('^>(.*)')
-	gi = re.compile('gi\|(\S+)\|ref\|(\S+)\|')
+	gi = re.compile(:')
 	# gid = ''
 	refseq = ''
 	while True:
