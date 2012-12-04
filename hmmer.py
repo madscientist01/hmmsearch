@@ -15,7 +15,6 @@ import re
 import glob
 import sys
 import subprocess
-import operator
 
 def readFasta(filename) :
 	#
@@ -136,7 +135,6 @@ class InputFile(object):
 				fileName = fetchfromUniprot(match.group(1))
 			if fileName:
 				if os.path.exists(fileName):
-					print fileName,name
 					self.fileNames.append(fileName)
 					self.proteinNames.append(name)
 		return
@@ -303,7 +301,7 @@ class Hmmer(object):
 		#
 		opener = urllib2.build_opener(SmartRedirectHandler())
 		urllib2.install_opener(opener)
-		print "Processing {0}".format(self.file)
+		print "Running Hmmscan of {0} using web service..".format(self.file)
 		if not self.db in ['pfam','superfamily','tigrfam', 'gene3d']:
 			print "{0} is not valid db. It should be pfam, superfamily, tigrfam or gene3d."
 			print "search will be carried out with pfam"
@@ -371,7 +369,7 @@ class Hmmer(object):
 		if os.path.exists(self.db):
 			outputFile = self.file+".tb"
 			hmmeroutFile = self.file+".hmmer"
-			print "Processing {0}".format(self.file)
+			print "Running Hmmscan of {0}".format(self.file)
 			#
 			# hmmscan --domtbout outputFile --cut_ga, DBfile, queryFile
 			#
@@ -769,7 +767,6 @@ class HmmerScanRunner(object):
 				if hmmer.runRemote():
 					self.hmmerResults.append(hmmer)
 		if len(self.hmmerResults)>0:
-			self.hmmerResults.sort(key=str(operator.attrgetter('name')).lower())
 			self.processHmmerResults()		
 			self.drawSVG()
 

@@ -11,7 +11,7 @@ from __future__ import division
 import urllib
 import urllib2
 import os
-# import xml.etree.ElementTree as ET
+import xml.etree.ElementTree as ET
 import argparse
 import re
 # import glob
@@ -99,33 +99,86 @@ def readFasta(filename) :
 			if match:
 				sequenceName = match.group(1)
 			else:
-				sequence = sequence+line			
+				sequence = sequence+line
+		f.close()			
 		return(sequenceName,sequence)	    	
 	else:
 		return(None)
 
-def fetchfromUniprot(uniprotId):
+def readHmm(filename):
+	hmm=''
+	if os.path.exists(filename):
+		f=open(filename)
+		while True:
+			line = f.readline()
+			if not line: 
+				break 
+			hmm=hmm+line
+		f.close()
+		return(hmm)
+	else:
+		return(None)
+
+def fetchFasta(proteinId,db):
+	#
+	# Fetch list (proteinId) of FASTA from the selected db.
+	#
+	fileNames={}
+	# if db can be downloadable in uniprot, download it.
+	current = 1
+	no = len(proteinId)
+	for singleId in proteinId:
+		if db in ['uniprotkb','swissprot','uniprotrefprot','rp15','env_nr','pdb', 'rp35', 'rp55', 'rp75']:
+			dbformat = "http://www.uniprot.org/uniprot/{0}.fasta"
+		if db in ['nr','env_nr']:
+			dbformat  = "http://www.ncbi.nlm.nih.gov/protein/{0}?report=fasta&log$=seqview&format=text"
+
+		fileName = fetchfromDB(singleId,dbformat)
+		print "{0}/{1} downloading {2}".format(current, no, fileName) 
+		if fileName:
+			if not singleId in fileNames: 
+				fileNames[singleId] = fileName
+
+		if db in ['pdb']:
+			fileName = fetchfromPDB(singleId)
+			if not fileName:
+				if not proteinId in fileNames: 
+					fileNames[singleId] = fileName
+		current+=1
+		
+	return(fileNames)
+
+
+def fetchfromPDB(pdbId):
+	#
+	# Not Yet Implemented
+	#
+
+	return(None)
+
+def fetchfromDB(dbId,dbformat):
 	#
 	# fetch fasta file using Rest interface of uniprot 
 	#  http://www.uniprot.org/faq/28
 	#
-	uniprotURL = "http://www.uniprot.org/uniprot/{0}.fasta".format(uniprotId)
-	fileName = uniprotId+".fasta"
+	uniprotURL = dbformat.format(dbId)
+	fileName = dbId+".fasta"
 	try:
 		req = urllib2.Request(uniprotURL)
 		u = urllib2.urlopen(req)
 		sequence = u.read()
-		fileName = uniprotId+".fasta"
+		fileName = dbId+".fasta"
 		f = open(fileName,'w')
 		f.write(sequence)
 		f.close()
 		return(fileName)
 
 	except urllib2.URLError:
-		print "{0} is not valid uniprot id".format(uniprotId)
+		print "{0} is not valid uniprot id".format(dbId)
     	return(None)
 
 	return(fileName)
+
 
 
 class SmartRedirectHandler(urllib2.HTTPRedirectHandler):
@@ -187,14 +240,16 @@ class HmmerSearchHit(object):
 		self.query=kwargs.get('query')
 		self.desc = kwargs.get('desc')
 		self.acc=kwargs.get('acc')
+		self.acc2=kwargs.get('acc2')
 		self.evalue = kwargs.get('evalue')
 		self.bitscore = kwargs.get('bitscore')
 		self.domainNo = kwargs.get('domainNo')
+		self.species = kwargs.get('species')
 		self.domains = []
 
 class HmmerSearch(object):
 	#
-	# Hmmscan wrapper class
+	# Hmmsearch wrapper class
 	#
 	def __init__(self, **kwargs):
 
@@ -203,6 +258,9 @@ class HmmerSearch(object):
 		self.cutoff=kwargs.get('evalue')
 		self.localHmmDB = kwargs.get('localHmmDB')
 		self.threshold = kwargs.get('threshold')
+		self.species = kwargs.get('species')
+		if self.species:
+			self.speciesFilter=self.species.split('+')
 		self.hits = []
 
 	def runLocal(self):
@@ -255,20 +313,90 @@ class HmmerSearch(object):
 			sys.exit() 
 			return(False)
 
+	def runRemote(self):
+		#
+		# Using Hmmsearch in Hmmer3 web service, find locations of domains in the Fasta sequence and store into class
+		#
+		hmm = readHmm(self.file)
+		if not hmm:
+			print "Fatal error:"
+			print "{0} does not exist.".format(self.file)
+			sys.exit()
+		# print hmm
+		opener = urllib2.build_opener(SmartRedirectHandler())
+		urllib2.install_opener(opener)
+		print "Processing {0}".format(self.file)
+		if not self.db in ['uniprotkb','swissprot','nr','uniprotrefprot','rp15','env_nr','pdb', 'rp35', 'rp55', 'rp75']:
+			print "invalid db. It should be uniprotkb,swissprot,nr, uniprotrefprot, rp15, env_nr, pdb, rp35, rp55 or rp75"
+			print "search will be carried out with swissprot"
+			self.db = 'swissprot'
+
+		parameters = {
+		              'seqdb':self.db,
+		              'threshold':self.threshold,
+		              'seq':hmm
+		             }
+		enc_params = urllib.urlencode(parameters);
+		#post the seqrch request to the server
+		request = urllib2.Request('http://hmmer.janelia.org/search/hmmsearch',enc_params)
+		#get the url where the results can be fetched from
+		results_url = urllib2.urlopen(request).getheader('location')
+		# modify the range, format and presence of alignments in your results here
+		res_params = {
+		              'output':'xml'
+		             }
+		# add the parameters to your request for the results
+		enc_res_params = urllib.urlencode(res_params)
+		modified_res_url = results_url + '?' + enc_res_params
+		# send a GET request to the server
+		results_request = urllib2.Request(modified_res_url)
+		data = urllib2.urlopen(results_request)
+		# print out the results
+		result = data.read()	
+		if result:
+			#
+			# Parse using ElementTree Modules (http://docs.python.org/2/library/xml.etree.elementtree.html)
+			#
+			f=open(self.file+".xml", "w")
+			f.write(result)
+			f.close()
+			root = ET.fromstring(result)
+			for child in root.iter('hits'):
+			
+				name = child.get('name')
+				desc = child.get('desc')
+				acc = child.get('acc')
+				acc2 = child.get('acc2')
+				evalue=child.get('evalue')				
+				domainNo = child.get('nreported')
+				bitscore = child.get('score')
+				species = child.get('species')
+				query=""
+				if  (float(evalue)<float(self.cutoff)):
+					if len(self.speciesFilter)>0:
+						if species in self.speciesFilter:
+							hit = HmmerSearchHit(target=name, query=query, desc=desc, acc=acc, acc2=acc2,bitscore=bitscore,
+													evalue=evalue, domainNo=domainNo,species=species)
+							self.hits.append(hit)
+					else:
+							hit = HmmerSearchHit(target=name, query=query, desc=desc, acc=acc, acc2=acc2,bitscore=bitscore,
+													evalue=evalue, domainNo=domainNo,species=species)
+							self.hits.append(hit)
+
+			return(True)
+		else:
+			print "Failed to retrieve results" 
+			return(False)
 
 def generateInputFile(proteinNames, fastaFileNames,inputFileName):
 
 
 	f=open(inputFileName,'w')
-
 	for (id,name) in proteinNames.items():
-		print name,fastaFileNames[id]
 		line = "FILE\t{0}\t{1}\n".format(name,fastaFileNames[id])
 		f.write(line)
 	f.close()
 	return(inputFileName)
-
-
 
 def main(argument):
 
@@ -293,28 +421,42 @@ def main(argument):
 	ids = []
 	proteinNames = {}
 	for hmmFile in hmmFiles:
-		hmmSearch = HmmerSearch(file=hmmFile, db=argument.proteindb, evalue=argument.evalue, threshold=threshold)
-		hmmSearch.runLocal()
-		for hit in hmmSearch.hits:
-			id =hit.target+' '+hit.desc.strip()
-			ids.append(id)
-			if not id in proteinNames:
-				proteinNames[id] = hit.desc.strip()
+		hmmSearch = HmmerSearch(file=hmmFile, db=argument.proteindb, evalue=argument.evalue, threshold=threshold, species=argument.species)
+		if argument.local:
+			hmmSearch.runLocal()
+			for hit in hmmSearch.hits:
+				id =hit.target+' '+hit.desc.strip()
+				ids.append(id)
+				if not id in proteinNames:
+					proteinNames[id] = hit.desc.strip()
+		else:
+			hmmSearch.runRemote()
+			for hit in hmmSearch.hits:
+				if hit.acc2:
+					id=hit.acc2
+				else:
+					id=hit.acc
+				ids.append(id)
+				if not id in proteinNames:
+					proteinNames[id] = hit.desc.strip()+'['+hit.species+']'
 			
 	## Bug fix needed,
-	fastaFileNames = extractMultiFasta(argument.proteindb,ids)
-	inputFileName = generateInputFile(proteinNames,fastaFileNames,'test.INP')
-	##
+
+	print "# of hits :{0}".format(len(hmmSearch.hits))
+	
 	if argument.local:
+		fastaFileNames = extractMultiFasta(argument.proteindb,ids)
+		inputFileName = generateInputFile(proteinNames,fastaFileNames,'test.INP')
 		db = hmmdb
 	else:
+		fastaFileNames = fetchFasta(ids,argument.proteindb)
+		inputFileName = generateInputFile(proteinNames,fastaFileNames,'test.INP')
 		db = 'pfam'
 
 	hmmerscan = HmmerScanRunner(files=fastaFileNames.values(), db=db, evalue=argument.evalue,inputFileName=inputFileName,
 								local = argument.local, outputfile = 'output.svg', threshold=argument.threshold, 
 								titlemode=True )
 	hmmerscan.run()
-
 
 
 if __name__ == "__main__":
@@ -333,6 +475,8 @@ if __name__ == "__main__":
 						help='run local Hmmer')
 	parser.add_argument('-t', '--no_threshold', dest='threshold',action='store_false', default=True,
 						help='Turn of Pfam gathering threshold. Enable to look up more weak(unreliable) domains')
+	parser.add_argument('-s', '--species', dest='species',
+						help='Confine search species. ex: Arabidopsis thaliana+Homo sapiens')
 	results = parser.parse_args()
 	main(results)
 
