@@ -1,6 +1,6 @@
 #!/usr/bin/python
 #
-# Hmmer3 based Protein Domain Visualizer 
+# Hmmer3 based Protein Domain Searcher/Visualizer 
 #
 # Written by Madscientist (http://madscientist.wordpress.com, https://github.com/madscientist01/)
 #
@@ -11,12 +11,13 @@ from __future__ import division
 import urllib
 import urllib2
 import os
-import xml.etree.ElementTree as ET
+# import xml.etree.ElementTree as ET
 import argparse
 import re
-import glob
+# import glob
 import sys
 import subprocess
+from hmmer import HmmerScanRunner
 
 def extractMultiFasta(multifasta,searchId):
 	
@@ -25,7 +26,8 @@ def extractMultiFasta(multifasta,searchId):
 	buffer=[]
 	f=open(multifasta)
 	header = re.compile('^>(.*)')
-	gi = re.compile(:')
+	gi = re.compile('gi\|(\S+)\|ref\|(\S+)\|')
+	strip = re.compile('(\S+).\S+')
 	# gid = ''
 	refseq = ''
 	while True:
@@ -49,8 +51,11 @@ def extractMultiFasta(multifasta,searchId):
 				capture = True
 				mat = gi.match(id)
 				if mat:
-					# gid = mat.group(1)
-					refseq = mat.group(2)
+					mat2 = strip.match(mat.group(2))
+					if mat2:
+						refseq = mat2.group(1)
+					else:	# gid = mat.group(1)
+						refseq = mat.group(2)
 		if capture:
 			buffer.append(line)
 
@@ -248,7 +253,6 @@ def main(argument):
 			hmmFile = singleHmm.run()
 			if hmmFile:
 				hmmFiles.append(hmmFile)
-
 	if (len(argument.hmmFiles)>0):
 		for hmmFile in argument.hmmFiles:
 			if os.path.exists(hmmFile):
@@ -256,16 +260,19 @@ def main(argument):
 	if argument.threshold:
 		threshold="cut_ga"
 	else:
-		threshold="No"
+		threshold = "No"
 
 	ids = []
 	for hmmFile in hmmFiles:
-
 		hmmSearch = HmmerSearch(file=hmmFile, db=argument.proteindb, evalue=argument.evalue, threshold=threshold)
 		hmmSearch.runLocal()
 		for hit in hmmSearch.hits:
 			ids.append(hit.target+' '+hit.desc.strip())
-	extractMultiFasta(argument.proteindb,ids)
+	fastafileNames = extractMultiFasta(argument.proteindb,ids)
+	hmmerscan = HmmerScanRunner(files=fastafileNames, db='pfam', evalue=argument.evalue,
+								local = argument.local, outputfile = 'output.svg', threshold=argument.threshold, titlemode=True )
+	hmmerscan.run()
+
 
 
 if __name__ == "__main__":

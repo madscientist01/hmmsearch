@@ -392,8 +392,7 @@ class HmmerScanRunner(object):
 	#
 	def __init__(self, **kwargs):
 		self.inputFileName = kwargs.get('inputFileName')
-		self.inputFile = InputFile(inputFileName=self.inputFileName)
-		self.inputFile.readInputFile()
+		self.inputFile = None
 		self.files=kwargs.get('files')
 		self.db = kwargs.get('db')
 		self.evalue = kwargs.get('evalue')
@@ -401,13 +400,18 @@ class HmmerScanRunner(object):
 		self.outputfile = kwargs.get('outputfile')
 		self.threshold = kwargs.get('threshold')
 		self.hmmerResults = []
+		self.titlemode = kwargs.get('titlemode',False)
 		
 	def drawSVG(self):
 		#
 		# Draw SVG based on the hmmer domaim
 		#
 		hmmcolors = {}
-		canvasHeight = len(self.hmmerResults)*60+100
+		if self.titlemode:
+			yDelta=120
+		else:
+			yDelta = 60	
+		canvasHeight = len(self.hmmerResults)*yDelta+100
 		canvasWidth=1200
 		colors = ['aliceblue','antiquewhite', 'aqua', 'aquamarine', 'azure', 'beige', 'bisque', 'black', 'blanchedalmond', 
 				'blue', 'blueviolet', 'brown', 'burlywood', 'cadetblue', 'chartreuse', 'chocolate', 'coral', 
@@ -472,8 +476,13 @@ class HmmerScanRunner(object):
 
 		for hmmer in self.hmmerResults:
 			# Draw Protein Text
-			text = ET.Element('text', x=str(x), y=str(y), fill='black', 
-								style='font-family:Sans-Serif;font-size:16px;text-anchor:left;dominant-baseline:middle')
+			if self.titlemode:
+				text = ET.Element('text', x=str(leftMargin), y=str(int(y-fontSize*2.5)), fill='black', 
+									style='font-family:Sans-Serif;font-size:16px;text-anchor:left;dominant-baseline:middle')
+	 		else:
+	 			text = ET.Element('text', x=str(x), y=str(y), fill='black', 
+									style='font-family:Sans-Serif;font-size:16px;text-anchor:left;dominant-baseline:middle')
+	 		
 	 		text.text = hmmer.name
 	 		doc.append(text)
 	 		# Draw Line
@@ -565,7 +574,7 @@ class HmmerScanRunner(object):
 				 		hitEnd.text = str(hit.end)
 				 		doc.append(hitEnd)
 
-	 		y+=60
+	 		y+=yDelta
 
 	 	f = open(self.outputfile, 'w')
 		f.write('<?xml version=\"1.0\" standalone=\"no\"?>\n')
@@ -579,93 +588,96 @@ class HmmerScanRunner(object):
 	#
 	# inject information of input file into hmmerResults 
 	#
-		colors = ['aliceblue','antiquewhite', 'aqua', 'aquamarine', 'azure', 'beige', 'bisque', 'black', 'blanchedalmond', 
-				'blue', 'blueviolet', 'brown', 'burlywood', 'cadetblue', 'chartreuse', 'chocolate', 'coral', 
-				'cornflowerblue', 'cornsilk', 'crimson', 'cyan', 'darkblue', 'darkcyan', 'darkgoldenrod', 'darkgray', 
-				'darkgreen', 'darkgrey', 'darkkhaki', 'darkmagenta', 'darkolivegreen', 'darkorange', 'darkorchid', 
-				'darkred', 'darksalmon', 'darkseagreen', 'darkslateblue', 'darkslategray', 'darkslategrey', 'darkturquoise', 
-				'darkviolet', 'deeppink', 'deepskyblue', 'dimgray', 'dimgrey', 'dodgerblue', 'firebrick', 'floralwhite', 
-				'forestgreen', 'fuchsia', 'gainsboro', 'ghostwhite', 'gold', 'goldenrod', 'gray', 'green', 'greenyellow',
-		 		'grey', 'honeydew', 'hotpink', 'indianred', 'indigo', 'ivory', 'khaki', 'lavender', 'lavenderblush',
-		  		'lawngreen', 'lemonchiffon', 'lightblue', 'lightcoral', 'lightcyan', 'lightgoldenrodyellow', 'lightgray',
-		   		'lightgreen', 'lightgrey', 'lightpink', 'lightsalmon', 'lightseagreen', 'lightskyblue', 'lightslategray',
-		    	'lightslategrey', 'lightsteelblue', 'lightyellow', 'lime', 'limegreen', 'linen', 'magenta', 'maroon',
-		     	'mediumaquamarine', 'mediumblue', 'mediumorchid', 'mediumpurple', 'mediumseagreen', 'mediumslateblue', 
-		     	'mediumspringgreen', 'mediumturquoise', 'mediumvioletred', 'midnightblue', 'mintcream', 'mistyrose', 
-		     	'moccasin', 'navajowhite', 'navy', 'oldlace', 'olive', 'olivedrab', 'orange', 'orangered', 'orchid', 
-		     	'palegoldenrod', 'palegreen', 'paleturquoise', 'palevioletred', 'papayawhip', 'peachpuff', 'peru', 
-		     	'pink', 'plum', 'powderblue', 'purple', 'red', 'rosybrown', 'royalblue', 'saddlebrown', 
-		     	'salmon', 'sandybrown', 'seagreen', 'seashell', 'sienna', 'silver', 'skyblue', 'slateblue', 
-		     	'slategray', 'slategrey', 'snow', 'springgreen', 'steelblue', 'tan', 'teal', 'thistle', 
-		     	'tomato', 'turquoise', 'violet', 'wheat', 'white', 'whitesmoke', 'yellow', 'yellowgreen']
+		if self.inputFile:
+			colors = ['aliceblue','antiquewhite', 'aqua', 'aquamarine', 'azure', 'beige', 'bisque', 'black', 'blanchedalmond', 
+					'blue', 'blueviolet', 'brown', 'burlywood', 'cadetblue', 'chartreuse', 'chocolate', 'coral', 
+					'cornflowerblue', 'cornsilk', 'crimson', 'cyan', 'darkblue', 'darkcyan', 'darkgoldenrod', 'darkgray', 
+					'darkgreen', 'darkgrey', 'darkkhaki', 'darkmagenta', 'darkolivegreen', 'darkorange', 'darkorchid', 
+					'darkred', 'darksalmon', 'darkseagreen', 'darkslateblue', 'darkslategray', 'darkslategrey', 'darkturquoise', 
+					'darkviolet', 'deeppink', 'deepskyblue', 'dimgray', 'dimgrey', 'dodgerblue', 'firebrick', 'floralwhite', 
+					'forestgreen', 'fuchsia', 'gainsboro', 'ghostwhite', 'gold', 'goldenrod', 'gray', 'green', 'greenyellow',
+			 		'grey', 'honeydew', 'hotpink', 'indianred', 'indigo', 'ivory', 'khaki', 'lavender', 'lavenderblush',
+			  		'lawngreen', 'lemonchiffon', 'lightblue', 'lightcoral', 'lightcyan', 'lightgoldenrodyellow', 'lightgray',
+			   		'lightgreen', 'lightgrey', 'lightpink', 'lightsalmon', 'lightseagreen', 'lightskyblue', 'lightslategray',
+			    	'lightslategrey', 'lightsteelblue', 'lightyellow', 'lime', 'limegreen', 'linen', 'magenta', 'maroon',
+			     	'mediumaquamarine', 'mediumblue', 'mediumorchid', 'mediumpurple', 'mediumseagreen', 'mediumslateblue', 
+			     	'mediumspringgreen', 'mediumturquoise', 'mediumvioletred', 'midnightblue', 'mintcream', 'mistyrose', 
+			     	'moccasin', 'navajowhite', 'navy', 'oldlace', 'olive', 'olivedrab', 'orange', 'orangered', 'orchid', 
+			     	'palegoldenrod', 'palegreen', 'paleturquoise', 'palevioletred', 'papayawhip', 'peachpuff', 'peru', 
+			     	'pink', 'plum', 'powderblue', 'purple', 'red', 'rosybrown', 'royalblue', 'saddlebrown', 
+			     	'salmon', 'sandybrown', 'seagreen', 'seashell', 'sienna', 'silver', 'skyblue', 'slateblue', 
+			     	'slategray', 'slategrey', 'snow', 'springgreen', 'steelblue', 'tan', 'teal', 'thistle', 
+			     	'tomato', 'turquoise', 'violet', 'wheat', 'white', 'whitesmoke', 'yellow', 'yellowgreen']
 
-		for i in range(len(self.inputFile.fileNames)):
-			for hmmerResult in self.hmmerResults:
-				if hmmerResult.file == self.inputFile.fileNames[i]:
-					hmmerResult.name = self.inputFile.proteinNames[i]
+			for i in range(len(self.inputFile.fileNames)):
+				for hmmerResult in self.hmmerResults:
+					if hmmerResult.file == self.inputFile.fileNames[i]:
+						hmmerResult.name = self.inputFile.proteinNames[i]
 
-		for domain in self.inputFile.domainDefinitions:
-			for hmmerResult in self.hmmerResults:
-				if (domain.proteinName == hmmerResult.name):
-					if domain.action == 'remove':
-						for hit in hmmerResult.hits:
-						#	print hit.name, domain.domainName, hit.start, domain.start, hit.end, domain.end
-							if (hit.name == domain.domainName) and (hit.start == domain.start) and (hit.end == domain.end):
-						#		print "excluded"
-								hit.exclude = True	
-					if domain.action == 'new':
-						pseudoHit = HmmerHit(name=domain.domainName, start=domain.start, end=domain.end)
-						hmmerResult.hits.append(pseudoHit)
-		
-		for renameDef in self.inputFile.renameDefinitions:
-			for hmmerResult in self.hmmerResults:
-				for hit in hmmerResult.hits:
-					if (hit.name == renameDef.domainName):
-						hit.name = renameDef.newName
+			for domain in self.inputFile.domainDefinitions:
+				for hmmerResult in self.hmmerResults:
+					if (domain.proteinName == hmmerResult.name):
+						if domain.action == 'remove':
+							for hit in hmmerResult.hits:
+							#	print hit.name, domain.domainName, hit.start, domain.start, hit.end, domain.end
+								if (hit.name == domain.domainName) and (hit.start == domain.start) and (hit.end == domain.end):
+							#		print "excluded"
+									hit.exclude = True	
+						if domain.action == 'new':
+							pseudoHit = HmmerHit(name=domain.domainName, start=domain.start, end=domain.end)
+							hmmerResult.hits.append(pseudoHit)
+			
+			for renameDef in self.inputFile.renameDefinitions:
+				for hmmerResult in self.hmmerResults:
+					for hit in hmmerResult.hits:
+						if (hit.name == renameDef.domainName):
+							hit.name = renameDef.newName
 
 
-		for colorDef in self.inputFile.colorDefinitions:
-			gradient = False
-			border = True
-			label = True
-			number = True
-			startshow = True
-			endshow = True
-			if colorDef.option:
-				options = colorDef.option.strip('+')
-				if 'gradient' in options:
-					gradient = True
-				if 'noborder' in options:
-					border = False
-				if 'nolabel' in options:
-					label = False
-				if 'nonumber' in options:
-					startshow = False
-					endshow = False
-				if 'nostart' in options:
-					startshow = False
-				if 'noend' in options:
-					endshow = False
+			for colorDef in self.inputFile.colorDefinitions:
+				gradient = False
+				border = True
+				label = True
+				number = True
+				startshow = True
+				endshow = True
+				if colorDef.option:
+					options = colorDef.option.strip('+')
+					if 'gradient' in options:
+						gradient = True
+					if 'noborder' in options:
+						border = False
+					if 'nolabel' in options:
+						label = False
+					if 'nonumber' in options:
+						startshow = False
+						endshow = False
+					if 'nostart' in options:
+						startshow = False
+					if 'noend' in options:
+						endshow = False
 
-			for hmmerResult in self.hmmerResults:
-				for hit in hmmerResult.hits:
-					if (hit.name == colorDef.domainName and colorDef.color in colors):
-						hit.color = colorDef.color
-						hit.gradient = gradient
-						hit.border = border
-						hit.label = label
-						hit.number = number
-						hit.startshow = startshow
-						hit.endshow = endshow
+				for hmmerResult in self.hmmerResults:
+					for hit in hmmerResult.hits:
+						if (hit.name == colorDef.domainName and colorDef.color in colors):
+							hit.color = colorDef.color
+							hit.gradient = gradient
+							hit.border = border
+							hit.label = label
+							hit.number = number
+							hit.startshow = startshow
+							hit.endshow = endshow
 		return 
 
 	def run(self):
 
-		if len(self.inputFile.fileNames)>0:
+		if self.inputFileName:
+			self.inputFile=InputFile(inputFileName=self.inputFileName)
+			self.inputFile.readInputFile()
 			files = self.inputFile.fileNames
-		elif not self.files:
-			files = glob.glob('*.fasta')
 		else:
+			if not self.files:
+				self.files = glob.glob('*.fasta')
 			files =self.files
 
 		if self.threshold:
@@ -702,7 +714,8 @@ if __name__ == "__main__":
 	parser.add_argument('-i', '--input_file', dest='inputFileName', default='hmmer.INP',
 						help='Read configuration file')
 	results = parser.parse_args()
-
+	if not os.path.exists(results.inputFileName):
+		results.inputFileName = None
 	hmmerscan = HmmerScanRunner(files=results.files,inputFileName=results.inputFileName, db=results.db, evalue=results.evalue,
 								local = results.local, outputfile = results.outputfile, threshold=results.threshold )
 	hmmerscan.run()
