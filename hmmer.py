@@ -9,7 +9,7 @@ from __future__ import division
 import urllib
 import urllib2
 import os
-import xml.etree.ElementTree as ET
+import xml.etree.cElementTree as ET
 import argparse
 import re
 import glob
@@ -36,6 +36,33 @@ def readFasta(filename) :
 		return(sequenceName,sequence)	    	
 	else:
 		return(None)
+
+def readAccession(filename) :
+	#
+	# From FASTA header, guess accession number and source
+	#
+	refseqRegex = re.compile('>gi\|(\S+)\|ref\|(\S+)\|')
+	uniprotRegex = re.compile('>sp\|(\S+)\|(\S+)')
+	db = ""
+	accession = ""
+	if os.path.exists(filename):		
+		f = open(filename)
+		line = f.readline().strip()
+		if not line: 
+			return(None) 
+		refSeqMatch = refseqRegex.match(line)
+		if refSeqMatch:
+			db = "refseq"
+			accession = refSeqMatch.group(2)
+		else:
+			uniprotMatch = uniprotRegex.match(line)
+			if uniprotMatch:
+				db = "uniprot"
+				accession = uniprotMatch.group(1)	
+
+	return(db, accession)	    	
+	
+
 
 def fetchfromUniprot(uniprotId):
 	#
@@ -98,7 +125,7 @@ class InputFile(object):
 		self.commands = {'FILE':'file','NEW':'new','RENAME':'rename','REMOVE':'remove', 'COLOR':'color', 'SIZE':'size', 'EVALUE':'evalue', 'DB':'db'}
 
 	def file(self,content):
-		data = content.split()
+		data = content.split('\t')
 		uniprot = re.compile("uniprot:(\S+)")
 		if len(data)>1:
 			name = data[0]
@@ -114,7 +141,7 @@ class InputFile(object):
 		return
 
 	def new(self,content):
-		data = content.split()
+		data = content.split('\t')
 		if len(data) > 1:
 			proteinName = data[0]
 			domainName = data[1]
@@ -137,7 +164,7 @@ class InputFile(object):
 		return
 
 	def rename(self,content):
-		data = content.split()
+		data = content.split('\t')
 		if len(data) > 1:
 			domainName = data[0]
 			newName = data[1]
@@ -155,7 +182,7 @@ class InputFile(object):
 		return
 
 	def remove(self,content):
-		data = content.split()
+		data = content.split('\t')
 		if len(data) > 1:
 			proteinName = data[0]
 			domainName = data[1]
@@ -170,7 +197,7 @@ class InputFile(object):
 		return
 
 	def color(self,content):
-		data = content.split()
+		data = content.split('\t')
 		if len(data) > 1:
 			domainName = data[0]
 			color = data[1]
@@ -181,6 +208,7 @@ class InputFile(object):
 		return
 
 	def readInputFile(self):
+
 		if os.path.exists(self.inputFileName):
 			f = open (self.inputFileName, 'r')
 			inputFileContent = f.readlines()
@@ -238,6 +266,7 @@ class Hmmer(object):
 		self.localHmmDB = kwargs.get('localHmmDB')
 		self.threshold = kwargs.get('threshold')
 		(self.name, self.sequence) = readFasta(self.file)
+		(self.source,self.accession)= readAccession(self.file)
 		self.length=len(self.sequence)
 		self.hits = []
 	
@@ -273,7 +302,7 @@ class Hmmer(object):
 		#
 		opener = urllib2.build_opener(SmartRedirectHandler())
 		urllib2.install_opener(opener)
-		print self.name
+		print "Processing {0}".format(self.file)
 		if not self.db in ['pfam','superfamily','tigrfam', 'gene3d']:
 			print "{0} is not valid db. It should be pfam, superfamily, tigrfam or gene3d."
 			print "search will be carried out with pfam"
@@ -406,13 +435,47 @@ class HmmerScanRunner(object):
 		#
 		# Draw SVG based on the hmmer domaim
 		#
+		x = 50
+		y = 50
+		leftMargin = 150
+		rightMargin = 100
+		fontSize = 16
 		hmmcolors = {}
+		maxLength = 0
+		maxTitleLength = 0
+		boxHeight = 20
+		maxLength = 0
+		for hmmerResult in self.hmmerResults:
+			if hmmerResult.length>maxLength:
+				maxlength=hmmerResult.length
+			if len(hmmerResult.name)>maxTitleLength:
+				maxTitleLength = len(hmmerResult.name)
+			if maxLength< hmmerResult.length:
+				maxLength= hmmerResult.length
+
+		canvasWidth=int(maxlength*0.7)
+		
+		effectiveWidth = canvasWidth -leftMargin - rightMargin		
+		#
+		# In Python 2.x, int division by int is int. but it became float in Python 3.*. 
+		#  from __future__ import division	was used 
+		#
+		conversion = effectiveWidth / maxLength
+		#
+		# If protein name width is bigger than leftMargin, wrote Label at top of proteins (self.titlemode=True)
+		#
+		if maxTitleLength*fontSize*conversion*0.7 > leftMargin:
+			self.titlemode = True
+		else:
+			self.titlemode = False
+
 		if self.titlemode:
 			yDelta=120
 		else:
 			yDelta = 60	
+
 		canvasHeight = len(self.hmmerResults)*yDelta+100
-		canvasWidth=1200
+	
 		colors = ['aliceblue','antiquewhite', 'aqua', 'aquamarine', 'azure', 'beige', 'bisque', 'black', 'blanchedalmond', 
 				'blue', 'blueviolet', 'brown', 'burlywood', 'cadetblue', 'chartreuse', 'chocolate', 'coral', 
 				'cornflowerblue', 'cornsilk', 'crimson', 'cyan', 'darkblue', 'darkcyan', 'darkgoldenrod', 'darkgray', 
@@ -436,6 +499,7 @@ class HmmerScanRunner(object):
 
 		gradientid = "test"
 		doc = ET.Element('svg', width=str(canvasWidth), height=str(canvasHeight), version='1.1', xmlns='http://www.w3.org/2000/svg')
+		doc.attrib["xmlns:xlink"]="http://www.w3.org/1999/xlink"
 		defs = ET.Element('defs')
 		gradientList = []
 		for hmmerResult in self.hmmerResults:
@@ -456,26 +520,20 @@ class HmmerScanRunner(object):
 						defs.append(gradient)
 
 		doc.append(defs)
-
-		x = 50
-		y = 50
-		leftMargin = 150
-		rightMargin = 100
-		fontSize = 16
-		effectiveWidth = canvasWidth -leftMargin - rightMargin
-		boxHeight = 20
-		maxLength = 0
-		for hmmer in self.hmmerResults:
-			if maxLength< hmmer.length:
-				maxLength= hmmer.length
-		#
-		# In Python 2.x, int division by int is int. but it became float in Python 3.*. 
-		#  from __future__ import division	was used 
-		#
-		conversion = effectiveWidth / maxLength
-
+		
 		for hmmer in self.hmmerResults:
 			# Draw Protein Text
+			if len(hmmer.source)>0 and len(hmmer.accession)>0:
+
+				if hmmer.source == 'refseq':
+					linkAddress = "http://www.ncbi.nlm.nih.gov/protein/{0}"
+				if hmmer.source == 'uniprot':
+					linkAddress = "http://www.uniprot.org/uniprot/{0}"
+
+				link = ET.Element('a')
+		 		link.attrib["xlink:href"]=linkAddress.format(hmmer.accession)
+
+
 			if self.titlemode:
 				text = ET.Element('text', x=str(leftMargin), y=str(int(y-fontSize*2.5)), fill='black', 
 									style='font-family:Sans-Serif;font-size:16px;text-anchor:left;dominant-baseline:middle')
@@ -484,7 +542,12 @@ class HmmerScanRunner(object):
 									style='font-family:Sans-Serif;font-size:16px;text-anchor:left;dominant-baseline:middle')
 	 		
 	 		text.text = hmmer.name
-	 		doc.append(text)
+	 		if len(hmmer.source)>0 and len(hmmer.accession)>0:
+	 			link.append(text)
+	 			doc.append(link)
+	 		else:
+	 			doc.append(text)
+
 	 		# Draw Line
 	 		line = ET.Element('line', x1=str(leftMargin), y1=str(y), x2=str(leftMargin+int(hmmer.length*conversion)),
 	 							 y2=str(y), style='stroke:rgb(200,200,200);stroke-width:4')
@@ -530,11 +593,18 @@ class HmmerScanRunner(object):
 		 			#
 		 			# Draw rectanglar domains
 		 			#
+		 			link = ET.Element('a')
+		 			link.attrib["xlink:href"]="http://pfam.sanger.ac.uk/family/{0}".format(hit.acc)
 		 			rect = ET.Element('rect', x=str(leftMargin+int(hit.start*conversion)), y=str(y-boxHeight/2),
 		 								 width=str(int((hit.end - hit.start)*conversion)), 
 		 								 height=str(boxHeight), style=style)
+		 			
+		 			if hit.acc:
+		 				link.append(rect)
+		 				doc.append(link)
+		 			else:
+		 				doc.append(rect)
 
-		 			doc.append(rect)
 		 			#
 		 			# Draw Domain Label
 		 			#
@@ -544,11 +614,16 @@ class HmmerScanRunner(object):
 							delta = -1*boxHeight
 						else:
 							delta = 0
-
+						link = ET.Element('a')
+		 				link.attrib["xlink:href"]="http://pfam.sanger.ac.uk/family/{0}".format(hit.acc)
 			 			textLabel = ET.Element('text',x=str(leftMargin+int((hit.start+(hit.end-hit.start)*0.5)*conversion)),y=str(y+delta),fill='black',
 			 									style='font-family:Sans-Serif;font-size:'+str(font)+'px;text-anchor:middle;alignment-baseline:middle')
 		 				textLabel.text = hit.name
-		 				doc.append(textLabel)
+		 				if hit.acc:
+		 					link.append(textLabel)
+		 					doc.append(link)
+		 				else:
+		 					doc.append(textLabel)
 		 			#
 		 			# Draw start and end aa numbers of the domain
 		 			#
