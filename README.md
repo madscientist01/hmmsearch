@@ -1,10 +1,10 @@
 ##Hmmer based domain search and drawing tools
 
-###usage
+###Usage
 
 	hmmer.py -f <Files> -d <hmm database> -e <evalue cutoff> -l -o <output file> -t -i <input file>
 
-###options
+###Options
 
 -f, --file : List of FASTA file. MultiFasta is not supported. If files are not assigned, it assumed as *.fasta on current directory
 
