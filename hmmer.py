@@ -386,294 +386,306 @@ class Hmmer(object):
 			return(False)
 
 
-def drawSVG(hmmerResults, filename):
+class HmmerScanRunner(object):
 	#
-	# Draw SVG based on the hmmer domaim
+	# Class for the Hmmer domain hits
 	#
-	hmmcolors = {}
-	canvasHeight = len(hmmerResults)*60+100
-	canvasWidth=1200
-	colors = ['aliceblue','antiquewhite', 'aqua', 'aquamarine', 'azure', 'beige', 'bisque', 'black', 'blanchedalmond', 
-			'blue', 'blueviolet', 'brown', 'burlywood', 'cadetblue', 'chartreuse', 'chocolate', 'coral', 
-			'cornflowerblue', 'cornsilk', 'crimson', 'cyan', 'darkblue', 'darkcyan', 'darkgoldenrod', 'darkgray', 
-			'darkgreen', 'darkgrey', 'darkkhaki', 'darkmagenta', 'darkolivegreen', 'darkorange', 'darkorchid', 
-			'darkred', 'darksalmon', 'darkseagreen', 'darkslateblue', 'darkslategray', 'darkslategrey', 'darkturquoise', 
-			'darkviolet', 'deeppink', 'deepskyblue', 'dimgray', 'dimgrey', 'dodgerblue', 'firebrick', 'floralwhite', 
-			'forestgreen', 'fuchsia', 'gainsboro', 'ghostwhite', 'gold', 'goldenrod', 'gray', 'green', 'greenyellow',
-	 		'grey', 'honeydew', 'hotpink', 'indianred', 'indigo', 'ivory', 'khaki', 'lavender', 'lavenderblush',
-	  		'lawngreen', 'lemonchiffon', 'lightblue', 'lightcoral', 'lightcyan', 'lightgoldenrodyellow', 'lightgray',
-	   		'lightgreen', 'lightgrey', 'lightpink', 'lightsalmon', 'lightseagreen', 'lightskyblue', 'lightslategray',
-	    	'lightslategrey', 'lightsteelblue', 'lightyellow', 'lime', 'limegreen', 'linen', 'magenta', 'maroon',
-	     	'mediumaquamarine', 'mediumblue', 'mediumorchid', 'mediumpurple', 'mediumseagreen', 'mediumslateblue', 
-	     	'mediumspringgreen', 'mediumturquoise', 'mediumvioletred', 'midnightblue', 'mintcream', 'mistyrose', 
-	     	'moccasin', 'navajowhite', 'navy', 'oldlace', 'olive', 'olivedrab', 'orange', 'orangered', 'orchid', 
-	     	'palegoldenrod', 'palegreen', 'paleturquoise', 'palevioletred', 'papayawhip', 'peachpuff', 'peru', 
-	     	'pink', 'plum', 'powderblue', 'purple', 'red', 'rosybrown', 'royalblue', 'saddlebrown', 
-	     	'salmon', 'sandybrown', 'seagreen', 'seashell', 'sienna', 'silver', 'skyblue', 'slateblue', 
-	     	'slategray', 'slategrey', 'snow', 'springgreen', 'steelblue', 'tan', 'teal', 'thistle', 
-	     	'tomato', 'turquoise', 'violet', 'wheat', 'white', 'whitesmoke', 'yellow', 'yellowgreen']
-	colorIndex = 10
+	def __init__(self, **kwargs):
+		self.inputFileName = kwargs.get('inputFileName')
+		self.inputFile = InputFile(inputFileName=self.inputFileName)
+		self.inputFile.readInputFile()
+		self.files=kwargs.get('files')
+		self.db = kwargs.get('db')
+		self.evalue = kwargs.get('evalue')
+		self.local = kwargs.get('local')
+		self.outputfile = kwargs.get('outputfile')
+		self.threshold = kwargs.get('threshold')
+		self.hmmerResults = []
+		
+	def drawSVG(self):
+		#
+		# Draw SVG based on the hmmer domaim
+		#
+		hmmcolors = {}
+		canvasHeight = len(self.hmmerResults)*60+100
+		canvasWidth=1200
+		colors = ['aliceblue','antiquewhite', 'aqua', 'aquamarine', 'azure', 'beige', 'bisque', 'black', 'blanchedalmond', 
+				'blue', 'blueviolet', 'brown', 'burlywood', 'cadetblue', 'chartreuse', 'chocolate', 'coral', 
+				'cornflowerblue', 'cornsilk', 'crimson', 'cyan', 'darkblue', 'darkcyan', 'darkgoldenrod', 'darkgray', 
+				'darkgreen', 'darkgrey', 'darkkhaki', 'darkmagenta', 'darkolivegreen', 'darkorange', 'darkorchid', 
+				'darkred', 'darksalmon', 'darkseagreen', 'darkslateblue', 'darkslategray', 'darkslategrey', 'darkturquoise', 
+				'darkviolet', 'deeppink', 'deepskyblue', 'dimgray', 'dimgrey', 'dodgerblue', 'firebrick', 'floralwhite', 
+				'forestgreen', 'fuchsia', 'gainsboro', 'ghostwhite', 'gold', 'goldenrod', 'gray', 'green', 'greenyellow',
+		 		'grey', 'honeydew', 'hotpink', 'indianred', 'indigo', 'ivory', 'khaki', 'lavender', 'lavenderblush',
+		  		'lawngreen', 'lemonchiffon', 'lightblue', 'lightcoral', 'lightcyan', 'lightgoldenrodyellow', 'lightgray',
+		   		'lightgreen', 'lightgrey', 'lightpink', 'lightsalmon', 'lightseagreen', 'lightskyblue', 'lightslategray',
+		    	'lightslategrey', 'lightsteelblue', 'lightyellow', 'lime', 'limegreen', 'linen', 'magenta', 'maroon',
+		     	'mediumaquamarine', 'mediumblue', 'mediumorchid', 'mediumpurple', 'mediumseagreen', 'mediumslateblue', 
+		     	'mediumspringgreen', 'mediumturquoise', 'mediumvioletred', 'midnightblue', 'mintcream', 'mistyrose', 
+		     	'moccasin', 'navajowhite', 'navy', 'oldlace', 'olive', 'olivedrab', 'orange', 'orangered', 'orchid', 
+		     	'palegoldenrod', 'palegreen', 'paleturquoise', 'palevioletred', 'papayawhip', 'peachpuff', 'peru', 
+		     	'pink', 'plum', 'powderblue', 'purple', 'red', 'rosybrown', 'royalblue', 'saddlebrown', 
+		     	'salmon', 'sandybrown', 'seagreen', 'seashell', 'sienna', 'silver', 'skyblue', 'slateblue', 
+		     	'slategray', 'slategrey', 'snow', 'springgreen', 'steelblue', 'tan', 'teal', 'thistle', 
+		     	'tomato', 'turquoise', 'violet', 'wheat', 'white', 'whitesmoke', 'yellow', 'yellowgreen']
+		colorIndex = 10
 
-	gradientid = "test"
-	doc = ET.Element('svg', width=str(canvasWidth), height=str(canvasHeight), version='1.1', xmlns='http://www.w3.org/2000/svg')
-	defs = ET.Element('defs')
-	gradientList = []
-	for hmmerResult in hmmerResults:
-		for hit in hmmerResult.hits:
-			if hit.gradient:
-				if not hit.color in gradientList:
-					gradientid = "gradient_"+hit.color
-					gradientList.append(gradientid)
-					gradient = ET.Element('linearGradient', id=gradientid, x1="0%",y1="-20%",x2="0%",y2="120%")
-					stop1 = ET.Element('stop', offset="0%", style="stop-color:white;stop-opacity:1")
-					stop2 = ET.Element('stop', offset="40%", style="stop-color:"+hit.color+";stop-opacity:1")
-					stop3 = ET.Element('stop', offset="60%", style="stop-color:"+hit.color+";stop-opacity:1")					
-					stop4 = ET.Element('stop', offset="100%", style="stop-color:white;stop-opacity:1")
-					gradient.append(stop1)
-					gradient.append(stop2)
-					gradient.append(stop3)
-					gradient.append(stop4)	
-					defs.append(gradient)
+		gradientid = "test"
+		doc = ET.Element('svg', width=str(canvasWidth), height=str(canvasHeight), version='1.1', xmlns='http://www.w3.org/2000/svg')
+		defs = ET.Element('defs')
+		gradientList = []
+		for hmmerResult in self.hmmerResults:
+			for hit in hmmerResult.hits:
+				if hit.gradient:
+					if not hit.color in gradientList:
+						gradientid = "gradient_"+hit.color
+						gradientList.append(gradientid)
+						gradient = ET.Element('linearGradient', id=gradientid, x1="0%",y1="-20%",x2="0%",y2="120%")
+						stop1 = ET.Element('stop', offset="0%", style="stop-color:white;stop-opacity:1")
+						stop2 = ET.Element('stop', offset="40%", style="stop-color:"+hit.color+";stop-opacity:1")
+						stop3 = ET.Element('stop', offset="60%", style="stop-color:"+hit.color+";stop-opacity:1")					
+						stop4 = ET.Element('stop', offset="100%", style="stop-color:white;stop-opacity:1")
+						gradient.append(stop1)
+						gradient.append(stop2)
+						gradient.append(stop3)
+						gradient.append(stop4)	
+						defs.append(gradient)
 
-	doc.append(defs)
+		doc.append(defs)
 
-	x = 50
-	y = 50
-	leftMargin = 150
-	rightMargin = 100
-	fontSize = 16
-	effectiveWidth = canvasWidth -leftMargin - rightMargin
-	boxHeight = 20
-	maxLength = 0
-	for hmmer in hmmerResults:
-		if maxLength< hmmer.length:
-			maxLength= hmmer.length
-	#
-	# In Python 2.x, int division by int is int. but it became float in Python 3.*. 
-	#  from __future__ import division	was used 
-	#
-	conversion = effectiveWidth / maxLength
+		x = 50
+		y = 50
+		leftMargin = 150
+		rightMargin = 100
+		fontSize = 16
+		effectiveWidth = canvasWidth -leftMargin - rightMargin
+		boxHeight = 20
+		maxLength = 0
+		for hmmer in self.hmmerResults:
+			if maxLength< hmmer.length:
+				maxLength= hmmer.length
+		#
+		# In Python 2.x, int division by int is int. but it became float in Python 3.*. 
+		#  from __future__ import division	was used 
+		#
+		conversion = effectiveWidth / maxLength
 
-	for hmmer in hmmerResults:
-		# Draw Protein Text
-		text = ET.Element('text', x=str(x), y=str(y), fill='black', 
-							style='font-family:Sans-Serif;font-size:16px;text-anchor:left;dominant-baseline:middle')
- 		text.text = hmmer.name
- 		doc.append(text)
- 		# Draw Line
- 		line = ET.Element('line', x1=str(leftMargin), y1=str(y), x2=str(leftMargin+int(hmmer.length*conversion)),
- 							 y2=str(y), style='stroke:rgb(200,200,200);stroke-width:4')
- 		doc.append(line)
- 		# Start and End Amino Acid Number
- 		start = ET.Element('text', x=str(leftMargin-fontSize), y=str(y), fill='black', 
-							style='font-family:Sans-Serif;font-size:13px;text-anchor:right;dominant-baseline:middle')
- 		start.text = '1'
- 		doc.append(start)
- 		end = ET.Element('text', x=str(leftMargin+int(hmmer.length*conversion)), y=str(y), fill='black', 
-							style='font-family:Sans-Serif;font-size:13px;text-anchor:left;dominant-baseline:middle')
- 		end.text = str(hmmer.length)
- 		doc.append(end)
- 		#
- 		# Draw Domains
- 		#
- 		for hit in hmmer.hits:
- 			if not hit.exclude:
- 				#
- 				# if color of domain is not assigned, choose color in table and increase it.
- 				#
- 				if not hit.color:
-		 			if hit.name in hmmcolors:
-		 				color = hmmcolors[hit.name]
+		for hmmer in self.hmmerResults:
+			# Draw Protein Text
+			text = ET.Element('text', x=str(x), y=str(y), fill='black', 
+								style='font-family:Sans-Serif;font-size:16px;text-anchor:left;dominant-baseline:middle')
+	 		text.text = hmmer.name
+	 		doc.append(text)
+	 		# Draw Line
+	 		line = ET.Element('line', x1=str(leftMargin), y1=str(y), x2=str(leftMargin+int(hmmer.length*conversion)),
+	 							 y2=str(y), style='stroke:rgb(200,200,200);stroke-width:4')
+	 		doc.append(line)
+	 		# Start and End Amino Acid Number
+	 		start = ET.Element('text', x=str(leftMargin-fontSize), y=str(y), fill='black', 
+								style='font-family:Sans-Serif;font-size:13px;text-anchor:right;dominant-baseline:middle')
+	 		start.text = '1'
+	 		doc.append(start)
+	 		end = ET.Element('text', x=str(leftMargin+int(hmmer.length*conversion)), y=str(y), fill='black', 
+								style='font-family:Sans-Serif;font-size:13px;text-anchor:left;dominant-baseline:middle')
+	 		end.text = str(hmmer.length)
+	 		doc.append(end)
+	 		#
+	 		# Draw Domains
+	 		#
+	 		for hit in hmmer.hits:
+	 			if not hit.exclude:
+	 				#
+	 				# if color of domain is not assigned, choose color in table and increase it.
+	 				#
+	 				if not hit.color:
+			 			if hit.name in hmmcolors:
+			 				color = hmmcolors[hit.name]
+			 			else:
+			 				hmmcolors[hit.name]=colors[colorIndex]
+			 				color = colors[colorIndex]
+			 				if colorIndex < len(colors)-1:
+			 					colorIndex+=1
+			 				else:
+			 					colorIndex = 0
+			 		else:
+			 			color = hit.color
+
+			 		if hit.border :
+			 			border = ';stroke-width:1;stroke:black'
+			 		else:
+			 			border = ''
+			 		if hit.gradient:
+			 			style='fill:url(#'+'gradient_'+hit.color+')'+border
+			 		else:
+			 			style = 'fill:'+color+border
+		 			#
+		 			# Draw rectanglar domains
+		 			#
+		 			rect = ET.Element('rect', x=str(leftMargin+int(hit.start*conversion)), y=str(y-boxHeight/2),
+		 								 width=str(int((hit.end - hit.start)*conversion)), 
+		 								 height=str(boxHeight), style=style)
+
+		 			doc.append(rect)
+		 			#
+		 			# Draw Domain Label
+		 			#
+		 			if hit.label:
+			 			font = 13
+			 			if (len(str(hit.name))*font*0.6>(hit.end - hit.start)*conversion):
+							delta = -1*boxHeight
+						else:
+							delta = 0
+
+			 			textLabel = ET.Element('text',x=str(leftMargin+int((hit.start+(hit.end-hit.start)*0.5)*conversion)),y=str(y+delta),fill='black',
+			 									style='font-family:Sans-Serif;font-size:'+str(font)+'px;text-anchor:middle;alignment-baseline:middle')
+		 				textLabel.text = hit.name
+		 				doc.append(textLabel)
+		 			#
+		 			# Draw start and end aa numbers of the domain
+		 			#
+		 			# Adjust location of number based on the domain length
+		 			#
+		 			font=9
+		 			if (leftMargin+hit.start*conversion+font*0.6*(len(str(hit.start))))>(leftMargin+hit.end*conversion-len(str(hit.end))*font*0.6):
+		 				deltaStart = int(font*-0.5*len(str(hit.start)))
+		 				deltaEnd = int(font*0.5*len(str(hit.end)))
 		 			else:
-		 				hmmcolors[hit.name]=colors[colorIndex]
-		 				color = colors[colorIndex]
-		 				if colorIndex < len(colors)-1:
-		 					colorIndex+=1
-		 				else:
-		 					colorIndex = 0
-		 		else:
-		 			color = hit.color
+		 				deltaStart = 0
+		 				deltaEnd = 0
 
-		 		if hit.border :
-		 			border = ';stroke-width:1;stroke:black'
-		 		else:
-		 			border = ''
-		 		if hit.gradient:
-		 			style='fill:url(#'+'gradient_'+hit.color+')'+border
-		 		else:
-		 			style = 'fill:'+color+border
-	 			#
-	 			# Draw rectanglar domains
-	 			#
-	 			rect = ET.Element('rect', x=str(leftMargin+int(hit.start*conversion)), y=str(y-boxHeight/2),
-	 								 width=str(int((hit.end - hit.start)*conversion)), 
-	 								 height=str(boxHeight), style=style)
+			 		if hit.startshow:	
+			 			hitStart = ET.Element('text', x=str(leftMargin+int(hit.start*conversion)+deltaStart), y=str(y+boxHeight), fill='black', 
+										style='font-family:Sans-Serif;font-size:'+str(font)+'px;text-anchor:left;dominant-baseline:top')
+				 		hitStart.text = str(hit.start)
+				 		doc.append(hitStart)
 
-	 			doc.append(rect)
-	 			#
-	 			# Draw Domain Label
-	 			#
-	 			if hit.label:
-		 			font = 13
-		 			if (len(str(hit.name))*font*0.6>(hit.end - hit.start)*conversion):
-						delta = -1*boxHeight
-					else:
-						delta = 0
+					if hit.endshow:		
+				 		hitEnd = ET.Element('text', x=str(leftMargin+int(hit.end*conversion)-len(str(hit.end))*font*0.6+deltaEnd), y=str(y+boxHeight), fill='black', 
+											style='font-family:Sans-Serif;font-size:'+str(font)+'px;text-anchor:right;dominant-baseline:top')
+				 		hitEnd.text = str(hit.end)
+				 		doc.append(hitEnd)
 
-		 			textLabel = ET.Element('text',x=str(leftMargin+int((hit.start+(hit.end-hit.start)*0.5)*conversion)),y=str(y+delta),fill='black',
-		 									style='font-family:Sans-Serif;font-size:'+str(font)+'px;text-anchor:middle;alignment-baseline:middle')
-	 				textLabel.text = hit.name
-	 				doc.append(textLabel)
-	 			#
-	 			# Draw start and end aa numbers of the domain
-	 			#
-	 			# Adjust location of number based on the domain length
-	 			#
-	 			font=9
-	 			if (leftMargin+hit.start*conversion+font*0.6*(len(str(hit.start))))>(leftMargin+hit.end*conversion-len(str(hit.end))*font*0.6):
-	 				deltaStart = int(font*-0.5*len(str(hit.start)))
-	 				deltaEnd = int(font*0.5*len(str(hit.end)))
-	 			else:
-	 				deltaStart = 0
-	 				deltaEnd = 0
+	 		y+=60
 
-		 		if hit.startshow:	
-		 			hitStart = ET.Element('text', x=str(leftMargin+int(hit.start*conversion)+deltaStart), y=str(y+boxHeight), fill='black', 
-									style='font-family:Sans-Serif;font-size:'+str(font)+'px;text-anchor:left;dominant-baseline:top')
-			 		hitStart.text = str(hit.start)
-			 		doc.append(hitStart)
+	 	f = open(self.outputfile, 'w')
+		f.write('<?xml version=\"1.0\" standalone=\"no\"?>\n')
+		f.write('<!DOCTYPE svg PUBLIC \"-//W3C//DTD SVG 1.1//EN\"\n')
+		f.write('\"http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd\">\n')
+		f.write(ET.tostring(doc))
+		f.close()
+		return
 
-				if hit.endshow:		
-			 		hitEnd = ET.Element('text', x=str(leftMargin+int(hit.end*conversion)-len(str(hit.end))*font*0.6+deltaEnd), y=str(y+boxHeight), fill='black', 
-										style='font-family:Sans-Serif;font-size:'+str(font)+'px;text-anchor:right;dominant-baseline:top')
-			 		hitEnd.text = str(hit.end)
-			 		doc.append(hitEnd)
+	def processHmmerResults(self):
+	#
+	# inject information of input file into hmmerResults 
+	#
+		colors = ['aliceblue','antiquewhite', 'aqua', 'aquamarine', 'azure', 'beige', 'bisque', 'black', 'blanchedalmond', 
+				'blue', 'blueviolet', 'brown', 'burlywood', 'cadetblue', 'chartreuse', 'chocolate', 'coral', 
+				'cornflowerblue', 'cornsilk', 'crimson', 'cyan', 'darkblue', 'darkcyan', 'darkgoldenrod', 'darkgray', 
+				'darkgreen', 'darkgrey', 'darkkhaki', 'darkmagenta', 'darkolivegreen', 'darkorange', 'darkorchid', 
+				'darkred', 'darksalmon', 'darkseagreen', 'darkslateblue', 'darkslategray', 'darkslategrey', 'darkturquoise', 
+				'darkviolet', 'deeppink', 'deepskyblue', 'dimgray', 'dimgrey', 'dodgerblue', 'firebrick', 'floralwhite', 
+				'forestgreen', 'fuchsia', 'gainsboro', 'ghostwhite', 'gold', 'goldenrod', 'gray', 'green', 'greenyellow',
+		 		'grey', 'honeydew', 'hotpink', 'indianred', 'indigo', 'ivory', 'khaki', 'lavender', 'lavenderblush',
+		  		'lawngreen', 'lemonchiffon', 'lightblue', 'lightcoral', 'lightcyan', 'lightgoldenrodyellow', 'lightgray',
+		   		'lightgreen', 'lightgrey', 'lightpink', 'lightsalmon', 'lightseagreen', 'lightskyblue', 'lightslategray',
+		    	'lightslategrey', 'lightsteelblue', 'lightyellow', 'lime', 'limegreen', 'linen', 'magenta', 'maroon',
+		     	'mediumaquamarine', 'mediumblue', 'mediumorchid', 'mediumpurple', 'mediumseagreen', 'mediumslateblue', 
+		     	'mediumspringgreen', 'mediumturquoise', 'mediumvioletred', 'midnightblue', 'mintcream', 'mistyrose', 
+		     	'moccasin', 'navajowhite', 'navy', 'oldlace', 'olive', 'olivedrab', 'orange', 'orangered', 'orchid', 
+		     	'palegoldenrod', 'palegreen', 'paleturquoise', 'palevioletred', 'papayawhip', 'peachpuff', 'peru', 
+		     	'pink', 'plum', 'powderblue', 'purple', 'red', 'rosybrown', 'royalblue', 'saddlebrown', 
+		     	'salmon', 'sandybrown', 'seagreen', 'seashell', 'sienna', 'silver', 'skyblue', 'slateblue', 
+		     	'slategray', 'slategrey', 'snow', 'springgreen', 'steelblue', 'tan', 'teal', 'thistle', 
+		     	'tomato', 'turquoise', 'violet', 'wheat', 'white', 'whitesmoke', 'yellow', 'yellowgreen']
 
- 		y+=60
+		for i in range(len(self.inputFile.fileNames)):
+			for hmmerResult in self.hmmerResults:
+				if hmmerResult.file == self.inputFile.fileNames[i]:
+					hmmerResult.name = self.inputFile.proteinNames[i]
 
- 	f = open(filename, 'w')
-	f.write('<?xml version=\"1.0\" standalone=\"no\"?>\n')
-	f.write('<!DOCTYPE svg PUBLIC \"-//W3C//DTD SVG 1.1//EN\"\n')
-	f.write('\"http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd\">\n')
-	f.write(ET.tostring(doc))
-	f.close()
-	return
-
-def processHmmerResults(hmmerResults, inputFile):
-#
-# inject information of input file into hmmerResults 
-#
-	colors = ['aliceblue','antiquewhite', 'aqua', 'aquamarine', 'azure', 'beige', 'bisque', 'black', 'blanchedalmond', 
-			'blue', 'blueviolet', 'brown', 'burlywood', 'cadetblue', 'chartreuse', 'chocolate', 'coral', 
-			'cornflowerblue', 'cornsilk', 'crimson', 'cyan', 'darkblue', 'darkcyan', 'darkgoldenrod', 'darkgray', 
-			'darkgreen', 'darkgrey', 'darkkhaki', 'darkmagenta', 'darkolivegreen', 'darkorange', 'darkorchid', 
-			'darkred', 'darksalmon', 'darkseagreen', 'darkslateblue', 'darkslategray', 'darkslategrey', 'darkturquoise', 
-			'darkviolet', 'deeppink', 'deepskyblue', 'dimgray', 'dimgrey', 'dodgerblue', 'firebrick', 'floralwhite', 
-			'forestgreen', 'fuchsia', 'gainsboro', 'ghostwhite', 'gold', 'goldenrod', 'gray', 'green', 'greenyellow',
-	 		'grey', 'honeydew', 'hotpink', 'indianred', 'indigo', 'ivory', 'khaki', 'lavender', 'lavenderblush',
-	  		'lawngreen', 'lemonchiffon', 'lightblue', 'lightcoral', 'lightcyan', 'lightgoldenrodyellow', 'lightgray',
-	   		'lightgreen', 'lightgrey', 'lightpink', 'lightsalmon', 'lightseagreen', 'lightskyblue', 'lightslategray',
-	    	'lightslategrey', 'lightsteelblue', 'lightyellow', 'lime', 'limegreen', 'linen', 'magenta', 'maroon',
-	     	'mediumaquamarine', 'mediumblue', 'mediumorchid', 'mediumpurple', 'mediumseagreen', 'mediumslateblue', 
-	     	'mediumspringgreen', 'mediumturquoise', 'mediumvioletred', 'midnightblue', 'mintcream', 'mistyrose', 
-	     	'moccasin', 'navajowhite', 'navy', 'oldlace', 'olive', 'olivedrab', 'orange', 'orangered', 'orchid', 
-	     	'palegoldenrod', 'palegreen', 'paleturquoise', 'palevioletred', 'papayawhip', 'peachpuff', 'peru', 
-	     	'pink', 'plum', 'powderblue', 'purple', 'red', 'rosybrown', 'royalblue', 'saddlebrown', 
-	     	'salmon', 'sandybrown', 'seagreen', 'seashell', 'sienna', 'silver', 'skyblue', 'slateblue', 
-	     	'slategray', 'slategrey', 'snow', 'springgreen', 'steelblue', 'tan', 'teal', 'thistle', 
-	     	'tomato', 'turquoise', 'violet', 'wheat', 'white', 'whitesmoke', 'yellow', 'yellowgreen']
-
-	for i in range(len(inputFile.fileNames)):
-		for hmmerResult in hmmerResults:
-			if hmmerResult.file == inputFile.fileNames[i]:
-				hmmerResult.name = inputFile.proteinNames[i]
-
-	for domain in inputFile.domainDefinitions:
-		for hmmerResult in hmmerResults:
-			if (domain.proteinName == hmmerResult.name):
-				if domain.action == 'remove':
-					for hit in hmmerResult.hits:
-					#	print hit.name, domain.domainName, hit.start, domain.start, hit.end, domain.end
-						if (hit.name == domain.domainName) and (hit.start == domain.start) and (hit.end == domain.end):
-					#		print "excluded"
-							hit.exclude = True	
-				if domain.action == 'new':
-					pseudoHit = HmmerHit(name=domain.domainName, start=domain.start, end=domain.end)
-					hmmerResult.hits.append(pseudoHit)
-	
-	for renameDef in inputFile.renameDefinitions:
-		for hmmerResult in hmmerResults:
-			for hit in hmmerResult.hits:
-				if (hit.name == renameDef.domainName):
-					hit.name = renameDef.newName
+		for domain in self.inputFile.domainDefinitions:
+			for hmmerResult in self.hmmerResults:
+				if (domain.proteinName == hmmerResult.name):
+					if domain.action == 'remove':
+						for hit in hmmerResult.hits:
+						#	print hit.name, domain.domainName, hit.start, domain.start, hit.end, domain.end
+							if (hit.name == domain.domainName) and (hit.start == domain.start) and (hit.end == domain.end):
+						#		print "excluded"
+								hit.exclude = True	
+					if domain.action == 'new':
+						pseudoHit = HmmerHit(name=domain.domainName, start=domain.start, end=domain.end)
+						hmmerResult.hits.append(pseudoHit)
+		
+		for renameDef in self.inputFile.renameDefinitions:
+			for hmmerResult in self.hmmerResults:
+				for hit in hmmerResult.hits:
+					if (hit.name == renameDef.domainName):
+						hit.name = renameDef.newName
 
 
-	for colorDef in inputFile.colorDefinitions:
-		gradient = False
-		border = True
-		label = True
-		number = True
-		startshow = True
-		endshow = True
-		if colorDef.option:
-			options = colorDef.option.strip('+')
-			if 'gradient' in options:
-				gradient = True
-			if 'noborder' in options:
-				border = False
-			if 'nolabel' in options:
-				label = False
-			if 'nonumber' in options:
-				startshow = False
-				endshow = False
-			if 'nostart' in options:
-				startshow = False
-			if 'noend' in options:
-				endshow = False
+		for colorDef in self.inputFile.colorDefinitions:
+			gradient = False
+			border = True
+			label = True
+			number = True
+			startshow = True
+			endshow = True
+			if colorDef.option:
+				options = colorDef.option.strip('+')
+				if 'gradient' in options:
+					gradient = True
+				if 'noborder' in options:
+					border = False
+				if 'nolabel' in options:
+					label = False
+				if 'nonumber' in options:
+					startshow = False
+					endshow = False
+				if 'nostart' in options:
+					startshow = False
+				if 'noend' in options:
+					endshow = False
 
-		for hmmerResult in hmmerResults:
-			for hit in hmmerResult.hits:
-				if (hit.name == colorDef.domainName and colorDef.color in colors):
-					hit.color = colorDef.color
-					hit.gradient = gradient
-					hit.border = border
-					hit.label = label
-					hit.number = number
-					hit.startshow = startshow
-					hit.endshow = endshow
-	return hmmerResults
+			for hmmerResult in self.hmmerResults:
+				for hit in hmmerResult.hits:
+					if (hit.name == colorDef.domainName and colorDef.color in colors):
+						hit.color = colorDef.color
+						hit.gradient = gradient
+						hit.border = border
+						hit.label = label
+						hit.number = number
+						hit.startshow = startshow
+						hit.endshow = endshow
+		return 
 
-def main(argument,inputFile):
+	def run(self):
 
-	if len(inputFile.fileNames)>0:
-		files = inputFile.fileNames
-	elif not argument.files:
-		files = glob.glob('*.fasta')
-	else:
-		files =argument.files
+		if len(self.inputFile.fileNames)>0:
+			files = self.inputFile.fileNames
+		elif not self.files:
+			files = glob.glob('*.fasta')
+		else:
+			files =self.files
 
-	hmmerResults=[]
-	if argument.threshold:
-		threshold = "cut_ga"
-	else:
-		threshold = "No"
-	for file in files:
-		hmmer = Hmmer(file=file,db=argument.db,evalue=argument.evalue,threshold=threshold)
-		if argument.local:
-			if hmmer.runLocal():
-				hmmerResults.append(hmmer)	
-		else:	
-			if hmmer.runRemote():
-				hmmerResults.append(hmmer)
-	if len(hmmerResults)>0:
-		newHmmerResults = processHmmerResults(hmmerResults,inputFile)		
-		drawSVG(newHmmerResults,argument.outputfile)
+		if self.threshold:
+			threshold = "cut_ga"
+		else:
+			threshold = "No"
+		for file in files:
+			hmmer = Hmmer(file=file,db=self.db,evalue=self.evalue,threshold=threshold)
+			if self.local:
+				if hmmer.runLocal():
+					self.hmmerResults.append(hmmer)	
+			else:	
+				if hmmer.runRemote():
+					self.hmmerResults.append(hmmer)
+		if len(self.hmmerResults)>0:
+			self.processHmmerResults()		
+			self.drawSVG()
 
 if __name__ == "__main__":
-
-	inputFile = InputFile(inputFileName='hmmer.INP')
-	inputFile.readInputFile()
-
+	
 	parser = argparse.ArgumentParser()
 	parser.add_argument('-f', '--fasta', nargs='+', dest='files',default=[],
 	                    help='Files to process')
@@ -687,6 +699,12 @@ if __name__ == "__main__":
 						help='Output svg filename')
 	parser.add_argument('-t', '--no_threshold', dest='threshold',action='store_false', default=True,
 						help='Turn of Pfam gathering threshold. Enable to look up more weak(unreliable) domains')
+	parser.add_argument('-i', '--input_file', dest='inputFileName', default='hmmer.INP',
+						help='Read configuration file')
 	results = parser.parse_args()
-	main(results,inputFile)
+
+	hmmerscan = HmmerScanRunner(files=results.files,inputFileName=results.inputFileName, db=results.db, evalue=results.evalue,
+								local = results.local, outputfile = results.outputfile, threshold=results.threshold )
+	hmmerscan.run()
+	
 
