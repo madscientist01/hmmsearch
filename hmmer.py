@@ -15,6 +15,7 @@ import re
 import glob
 import sys
 import subprocess
+import operator
 
 def readFasta(filename) :
 	#
@@ -768,6 +769,7 @@ class HmmerScanRunner(object):
 				if hmmer.runRemote():
 					self.hmmerResults.append(hmmer)
 		if len(self.hmmerResults)>0:
+			self.hmmerResults.sort(key=str(operator.attrgetter('name')).lower())
 			self.processHmmerResults()		
 			self.drawSVG()
 
