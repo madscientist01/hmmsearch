@@ -127,24 +127,25 @@ def fetchFasta(proteinId,db):
 	# if db can be downloadable in uniprot, download it.
 	current = 1
 	no = len(proteinId)
-	for singleId in proteinId:
-		if db in ['uniprotkb','swissprot','uniprotrefprot','rp15','env_nr','pdb', 'rp35', 'rp55', 'rp75']:
-			dbformat = "http://www.uniprot.org/uniprot/{0}.fasta"
-		if db in ['nr','env_nr']:
-			dbformat  = "http://www.ncbi.nlm.nih.gov/protein/{0}?report=fasta&log$=seqview&format=text"
+	if db in ['uniprotkb','swissprot','uniprotrefprot','rp15','env_nr','pdb', 'rp35', 'rp55', 'rp75','nr','env_nr', 'pdb']:
+		for singleId in proteinId:
+			if db in ['uniprotkb','swissprot','uniprotrefprot','rp15','env_nr','pdb', 'rp35', 'rp55', 'rp75']:
+				dbformat = "http://www.uniprot.org/uniprot/{0}.fasta"
+			if db in ['nr','env_nr']:
+				dbformat  = "http://www.ncbi.nlm.nih.gov/protein/{0}?report=fasta&log$=seqview&format=text"
 
-		fileName = fetchfromDB(singleId,dbformat)
-		print "{0}/{1} downloading {2}".format(current, no, fileName) 
-		if fileName:
-			if not singleId in fileNames: 
-				fileNames[singleId] = fileName
-
-		if db in ['pdb']:
-			fileName = fetchfromPDB(singleId)
-			if not fileName:
-				if not proteinId in fileNames: 
+			fileName = fetchfromDB(singleId,dbformat)
+			print "{0}/{1} downloading {2}".format(current, no, fileName) 
+			if fileName:
+				if not singleId in fileNames: 
 					fileNames[singleId] = fileName
-		current+=1
+
+			if db in ['pdb']:
+				fileName = fetchfromPDB(singleId)
+				if not fileName:
+					if not proteinId in fileNames: 
+						fileNames[singleId] = fileName
+			current+=1
 		
 	return(fileNames)
 
@@ -323,7 +324,7 @@ class HmmerSearch(object):
 		# print hmm
 		opener = urllib2.build_opener(SmartRedirectHandler())
 		urllib2.install_opener(opener)
-		print "Processing {0}".format(self.file)
+		print "search {0} in remote database".format(self.file)
 		if not self.db in ['uniprotkb','swissprot','nr','uniprotrefprot','rp15','env_nr','pdb', 'rp35', 'rp55', 'rp75']:
 			print "invalid db. It should be uniprotkb,swissprot,nr, uniprotrefprot, rp15, env_nr, pdb, rp35, rp55 or rp75"
 			print "search will be carried out with swissprot"
@@ -387,14 +388,26 @@ class HmmerSearch(object):
 			print "Failed to retrieve results" 
 			return(False)
 
-def generateInputFile(proteinNames, fastaFileNames,inputFileName):
+def generateInputFile(proteinNames, fastaFileNames, inputFileName, argument):
 
 
 	f=open(inputFileName,'w')
 	for (id,name) in proteinNames.items():
 		line = "FILE\t{0}\t{1}\n".format(name,fastaFileNames[id])
 		f.write(line)
+
+	if argument.localscan:
+		f.write("SETUP\tLOCAL\t{0}\n".format(argument.hmmdb))
+	else:
+		f.write("SETUP\tREMOTE\t{0}\n".format("pfam"))
+
+	if argument.domains:
+		fileNameBase = ''.join(argument.domains)
+		f.write("SETUP\tOUTPUTHTML\t{0}.html\n".format(fileNameBase))
+		f.write("SETUP\tOUTPUTSVG\t{0}.svg\n".format(fileNameBase))
+
 	f.close()
+
 	return(inputFileName)
 
 def main(argument):
@@ -443,21 +456,14 @@ def main(argument):
 		## Bug fix needed,
 
 		print "# of hits :{0}".format(len(hmmSearch.hits))
-		
+		inputFileName = ''.join(argument.domains)+'.INP'
 		if argument.local:
 			fastaFileNames = extractMultiFasta(argument.proteindb,ids)
-			inputFileName = generateInputFile(proteinNames,fastaFileNames,'test.INP')
+			inputFileName = generateInputFile(proteinNames,fastaFileNames,inputFileName,argument)
 		else:
 			fastaFileNames = fetchFasta(ids,argument.proteindb)
-			inputFileName = generateInputFile(proteinNames,fastaFileNames,'test.INP')
-		if argument.localscan:
-			db = argument.hmmdb
-		else:
-			db = 'pfam'
-
-		hmmerscan = HmmerScanRunner(files=fastaFileNames.values(), db=db, evalue=argument.evalue,inputFileName=inputFileName,
-									local = argument.localscan, outputfile = 'output.svg', threshold=argument.threshold, 
-									titlemode=True )
+			inputFileName = generateInputFile(proteinNames,fastaFileNames,inputFileName,argument)
+		hmmerscan = HmmerScanRunner(inputFileName=inputFileName)
 		hmmerscan.run()
 	else:
 		print "Nothing to do!"

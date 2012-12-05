@@ -11,219 +11,12 @@ import urllib2
 import os
 import xml.etree.cElementTree as ET
 import argparse
-import re
 import glob
 import sys
 import subprocess
 from htmltable import HTMLTable
-
-def readFasta(filename) :
-	#
-	# Simple FASTA reader. return sequence name with sequence as a string
-	#
-	sequence = ''
-	sequenceName = ''
-	if os.path.exists(filename):		
-		f = open(filename)
-		while True:
-			line = f.readline().strip()
-			if not line: 
-				break 
-			match = re.match('^>(.*)',line)
-			if match:
-				sequenceName = match.group(1)
-			else:
-				sequence = sequence+line
-		f.close()			
-		return(sequenceName,sequence)	    	
-	else:
-		return(None)
-
-def readAccession(filename) :
-	#
-	# From FASTA header, guess accession number and source
-	#
-	refseqRegex = re.compile('>gi\|(\S+)\|ref\|(\S+)\|')
-	uniprotRegex = re.compile('>sp\|(\S+)\|(\S+)')
-	db = ""
-	accession = ""
-	if os.path.exists(filename):		
-		f = open(filename)
-		line = f.readline().strip()
-		if not line: 
-			return(None) 
-		refSeqMatch = refseqRegex.match(line)
-		if refSeqMatch:
-			db = "refseq"
-			accession = refSeqMatch.group(2)
-		else:
-			uniprotMatch = uniprotRegex.match(line)
-			if uniprotMatch:
-				db = "uniprot"
-				accession = uniprotMatch.group(1)	
-		f.close()
-	return(db, accession)	    	
-	
-def fetchfromUniprot(uniprotId):
-	#
-	# fetch fasta file using Rest interface of uniprot 
-	#  http://www.uniprot.org/faq/28
-	#
-	uniprotURL = "http://www.uniprot.org/uniprot/{0}.fasta".format(uniprotId)
-	fileName = uniprotId+".fasta"
-	try:
-		req = urllib2.Request(uniprotURL)
-		u = urllib2.urlopen(req)
-		sequence = u.read()
-		fileName = uniprotId+".fasta"
-		f = open(fileName,'w')
-		f.write(sequence)
-		f.close()
-		return(fileName)
-
-	except urllib2.URLError:
-		print "{0} is not valid uniprot id".format(uniprotId)
-    	return(None)
-
-	return(fileName)
-
-class DomainDefinition(object):
-
-	def __init__(self, **kwargs):
-		self.proteinName = kwargs.get('proteinName')
-		self.domainName = kwargs.get('domainName')
-		self.accession = kwargs.get('acession')
-		self.start = int(kwargs.get('start'))
-		self.end = int(kwargs.get('end'))
-		self.action = kwargs.get('action')
-
-class ColorDefinition(object):
-	def __init__(self, **kwargs):
-		self.domainName = kwargs.get('domainName')
-		self.accession = kwargs.get('acession')
-		self.color = kwargs.get('color')
-		self.option = kwargs.get('option')
-
-class RenameDefinition(object):
-	def __init__(self, **kwargs):
-		self.domainName = kwargs.get('domainName')
-		self.newName = kwargs.get('newName')
-
-class InputFile(object):
-	#
-	# Input File (Hmmer.INP) processing class
-	#
-	def __init__(self, **kwargs):
-		self.domainDefinitions = []
-		self.colorDefinitions = []
-		self.renameDefinitions = []
-		self.inputFileName = kwargs.get('inputFileName')
-		self.fileNames = []
-		self.proteinNames = []
-		self.searchDB = ""
-		self.outputFileName = ""
-		self.commands = {'FILE':'file','NEW':'new','RENAME':'rename','REMOVE':'remove', 'COLOR':'color', 'SIZE':'size', 'EVALUE':'evalue', 'DB':'db'}
-
-	def file(self,content):
-		data = content.split('\t')
-		uniprot = re.compile("uniprot:(\S+)")
-		if len(data)>1:
-			name = data[0]
-			fileName = data[1]
-			match = uniprot.match(fileName)
-			if match:
-				fileName = fetchfromUniprot(match.group(1))
-			if fileName:
-				if os.path.exists(fileName):
-					self.fileNames.append(fileName)
-					self.proteinNames.append(name)
-		return
-
-	def new(self,content):
-		data = content.split('\t')
-		if len(data) > 1:
-			proteinName = data[0]
-			domainName = data[1]
-			if data[2] < data[3]:
-				start=data[2]
-				end = data[3]
-			else:
-				start=data[3]
-				end = data[2]
-
-			if len(data) > 4:
-				color = data[4]
-				colorDef = ColorDefinition(domainName=domainName, color=color)
-				self.colorDefinitions.append(colorDef)
-			if len(data) > 5:
-				colorDef.option = data[5]
-
-			domain = DomainDefinition(proteinName=proteinName, domainName=domainName, start=start, end=end, action='new')
-			self.domainDefinitions.append(domain)
-		return
-
-	def rename(self,content):
-		data = content.split('\t')
-		if len(data) > 1:
-			domainName = data[0]
-			newName = data[1]
-
-			if len(data) > 2:
-				color = data[2]
-				colorDef = ColorDefinition(domainName=newName, color=color)
-				self.colorDefinitions.append(colorDef)
-			if len(data) > 3:
-				colorDef.option = data[3]
-
-			rename = RenameDefinition(domainName=domainName, newName=newName)
-			self.renameDefinitions.append(rename)
-		
-		return
-
-	def remove(self,content):
-		data = content.split('\t')
-		if len(data) > 1:
-			proteinName = data[0]
-			domainName = data[1]
-			if data[2] < data[3]:
-				start=data[2]
-				end = data[3]
-			else:
-				start=data[3]
-				end = data[2]
-			domain = DomainDefinition(proteinName=proteinName, domainName=domainName, start=start, end=end, action='remove')
-			self.domainDefinitions.append(domain)
-		return
-
-	def color(self,content):
-		data = content.split('\t')
-		if len(data) > 1:
-			domainName = data[0]
-			color = data[1]
-			colorDef = ColorDefinition(domainName=domainName, color=color)
-			self.colorDefinitions.append(colorDef)
-			if len(data) > 2:
-				colorDef.option = data[2]
-		return
-
-	def readInputFile(self):
-
-		if os.path.exists(self.inputFileName):
-			f = open (self.inputFileName, 'r')
-			inputFileContent = f.readlines()
-			regex = re.compile("^(\S+)\s+(.*)$")
-			for line in inputFileContent:
-				if line[0:1] != "#":
-					match = regex.match(line)
-					if match:
-						keyword = match.group(1)
-						content = match.group(2)
-						if keyword in self.commands:
-							process=getattr(self, self.commands[keyword])
-							process(content)
-			return(True)
-		else:
-			return(False)
+from inputfile import InputFile
+from fetchutil import readFasta, readAccession
 
 class HmmerHit(object):
 	#
@@ -439,7 +232,8 @@ class HmmerScanRunner(object):
 		self.db = kwargs.get('db')
 		self.evalue = kwargs.get('evalue')
 		self.local = kwargs.get('local')
-		self.outputfile = kwargs.get('outputfile')
+		self.outputHTML = kwargs.get('outputHTML')
+		self.outputSVG = kwargs.get('outputSVG')
 		self.threshold = kwargs.get('threshold')
 		self.hmmerResults = []
 		self.titlemode = kwargs.get('titlemode',False)
@@ -512,7 +306,7 @@ class HmmerScanRunner(object):
 			doc = self.singleSVG(hmmer,doc,x,y,leftMargin,fontSize,conversion,boxHeight)
 	 		y+=yDelta
 
-	 	self.saveSVG(self.outputfile,doc)
+	 	self.saveSVG(self.outputSVG,doc)
 		return('\n'.join(ET.tostringlist(doc)))
 	
 
@@ -839,6 +633,13 @@ class HmmerScanRunner(object):
 			self.inputFile=InputFile(inputFileName=self.inputFileName)
 			self.inputFile.readInputFile()
 			files = self.inputFile.fileNames
+			self.db = self.inputFile.db
+			self.threshold = self.inputFile.threshold
+			self.local = self.inputFile.local
+			self.evalue = self.inputFile.evalue
+			self.outputHTML = self.inputFile.outputHTML
+			print self.outputHTML
+			self.outputSVG = self.inputFile.outputSVG
 		else:
 			if not self.files:
 				self.files = glob.glob('*.fasta')
@@ -890,8 +691,8 @@ class HmmerScanRunner(object):
 				table.tableContentFill([accessionLink, nameLink, domains, length])
 				svgList.svgContentFill([hmmerResult.accession,svgContent[hmmerResult.name]])
 			svg = svgList.svgEmbedContent
-			table.extra = "<div>"+svg+"</div>"
-			table.tableGenerate('test.html')
+			table.extra = "<br><div>"+svg+"</div>"
+			table.tableGenerate(self.outputHTML)
 
 if __name__ == "__main__":
 	
@@ -904,8 +705,10 @@ if __name__ == "__main__":
 						help='E-value cutoff')
 	parser.add_argument('-l', '--local',action='store_true', dest='local', default=False, 
 						help='run local Hmmer')
-	parser.add_argument('-o', '--output', dest='outputfile', default='output.svg', 
-						help='Output svg filename')
+	parser.add_argument('-o', '--outputhtml', dest='outputHTML', default='output.html', 
+						help='Output HTML filename')
+	parser.add_argument('-s', '--outputsvg', dest='outputSVG', default='output.svg', 
+						help='Output SVG filename')
 	parser.add_argument('-t', '--no_threshold', dest='threshold',action='store_false', default=True,
 						help='Turn of Pfam gathering threshold. Enable to look up more weak(unreliable) domains')
 	parser.add_argument('-i', '--input_file', dest='inputFileName', default='hmmer.INP',
@@ -914,7 +717,7 @@ if __name__ == "__main__":
 	if not os.path.exists(results.inputFileName):
 		results.inputFileName = None
 	hmmerscan = HmmerScanRunner(files=results.files,inputFileName=results.inputFileName, db=results.db, evalue=results.evalue,
-								local = results.local, outputfile = results.outputfile, threshold=results.threshold )
+								local = results.local, outputHTML = results.outputHTML, outputSVG = results.outputSVG, threshold=results.threshold )
 	hmmerscan.run()
 	
 
