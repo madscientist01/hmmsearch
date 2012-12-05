@@ -431,7 +431,8 @@ class HmmerScanRunner(object):
 		self.threshold = kwargs.get('threshold')
 		self.hmmerResults = []
 		self.titlemode = kwargs.get('titlemode',False)
-		
+	
+
 	def drawSVG(self):
 		#
 		# Draw SVG based on the hmmer domaim
@@ -441,7 +442,6 @@ class HmmerScanRunner(object):
 		leftMargin = 150
 		rightMargin = 100
 		fontSize = 16
-		hmmcolors = {}
 		maxLength = 0
 		maxTitleLength = 0
 		boxHeight = 20
@@ -454,8 +454,7 @@ class HmmerScanRunner(object):
 			if maxLength< hmmerResult.length:
 				maxLength= hmmerResult.length
 
-		canvasWidth=int(maxlength*0.7)
-		
+		canvasWidth=int(maxlength*0.7)	
 		effectiveWidth = canvasWidth -leftMargin - rightMargin		
 		#
 		# In Python 2.x, int division by int is int. but it became float in Python 3.*. 
@@ -472,11 +471,34 @@ class HmmerScanRunner(object):
 
 		if self.titlemode:
 			yDelta=120
+			leftMargin = 20
+			effectiveWidth = canvasWidth -leftMargin - rightMargin
+			conversion = effectiveWidth / maxLength
 		else:
 			yDelta = 60	
-
 		canvasHeight = len(self.hmmerResults)*yDelta+100
-	
+		doc = ET.Element('svg', width=str(canvasWidth), height=str(canvasHeight), version='1.2', xmlns='http://www.w3.org/2000/svg')
+		doc.attrib["xmlns:xlink"]="http://www.w3.org/1999/xlink"
+		doc.attrib["xmlns:svg"]="'http://www.w3.org/2000/svg'"		
+		defs = self.colorDef()
+		doc.append(defs)
+		
+		for hmmer in self.hmmerResults:
+			# Draw Protein Text
+			doc = self.singleSVG(hmmer,doc,x,y,leftMargin,fontSize,conversion,boxHeight)
+	 		y+=yDelta
+
+	 	f = open(self.outputfile, 'w')
+		f.write('<?xml version=\"1.0\" standalone=\"no\"?>\n')
+		f.write('<!DOCTYPE svg PUBLIC \"-//W3C//DTD SVG 1.1//EN\"\n')
+		f.write('\"http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd\">\n')
+		f.write('\n'.join(ET.tostringlist(doc)))
+		f.close()
+		return('\n'.join(ET.tostringlist(doc)))
+
+
+	def colorDef(self):
+		
 		colors = ['aliceblue','antiquewhite', 'aqua', 'aquamarine', 'azure', 'beige', 'bisque', 'black', 'blanchedalmond', 
 				'blue', 'blueviolet', 'brown', 'burlywood', 'cadetblue', 'chartreuse', 'chocolate', 'coral', 
 				'cornflowerblue', 'cornsilk', 'crimson', 'cyan', 'darkblue', 'darkcyan', 'darkgoldenrod', 'darkgray', 
@@ -496,15 +518,22 @@ class HmmerScanRunner(object):
 		     	'salmon', 'sandybrown', 'seagreen', 'seashell', 'sienna', 'silver', 'skyblue', 'slateblue', 
 		     	'slategray', 'slategrey', 'snow', 'springgreen', 'steelblue', 'tan', 'teal', 'thistle', 
 		     	'tomato', 'turquoise', 'violet', 'wheat', 'white', 'whitesmoke', 'yellow', 'yellowgreen']
+		hmmcolors = {}
 		colorIndex = 10
-
-		gradientid = "test"
-		doc = ET.Element('svg', width=str(canvasWidth), height=str(canvasHeight), version='1.1', xmlns='http://www.w3.org/2000/svg')
-		doc.attrib["xmlns:xlink"]="http://www.w3.org/1999/xlink"
 		defs = ET.Element('defs')
 		gradientList = []
 		for hmmerResult in self.hmmerResults:
 			for hit in hmmerResult.hits:
+				if not hit.color:
+		 			if hit.name in hmmcolors:
+		 				hit.color = hmmcolors[hit.name]
+		 			else:
+		 				hmmcolors[hit.name]=colors[colorIndex]
+		 				hit.color = colors[colorIndex]
+		 				if colorIndex < len(colors)-1:
+		 					colorIndex+=1
+		 				else:
+		 					colorIndex = 0
 				if hit.gradient:
 					if not hit.color in gradientList:
 						gradientid = "gradient_"+hit.color
@@ -519,154 +548,126 @@ class HmmerScanRunner(object):
 						gradient.append(stop3)
 						gradient.append(stop4)	
 						defs.append(gradient)
+		return(defs)	
 
-		doc.append(defs)
-		
-		for hmmer in self.hmmerResults:
+	def singleSVG(self,hmmer,doc,x,y,leftMargin,fontSize,conversion,boxHeight):
 			# Draw Protein Text
-			if len(hmmer.source)>0 and len(hmmer.accession)>0:
+		if len(hmmer.source)>0 and len(hmmer.accession)>0:
 
-				if hmmer.source == 'refseq':
-					linkAddress = "http://www.ncbi.nlm.nih.gov/protein/{0}"
-				if hmmer.source == 'uniprot':
-					linkAddress = "http://www.uniprot.org/uniprot/{0}"
-
-
-				anchor = ET.Element('a')
-		 	 	anchor.attrib["xlink:href"]="#"+hmmer.accession
-		 	 	doc.append(anchor)
-
-				link = ET.Element('a')
-		 		link.attrib["xlink:href"]=linkAddress.format(hmmer.accession)
+			if hmmer.source == 'refseq':
+				linkAddress = "http://www.ncbi.nlm.nih.gov/protein/{0}"
+			if hmmer.source == 'uniprot':
+				linkAddress = "http://www.uniprot.org/uniprot/{0}"
+			
+			link = ET.Element('a')
+	 		link.attrib["xlink:href"]=linkAddress.format(hmmer.accession)
 
 
-			if self.titlemode:
-				text = ET.Element('text', x=str(leftMargin), y=str(int(y-fontSize*2.5)), fill='black', 
-									style='font-family:Sans-Serif;font-size:16px;text-anchor:left;dominant-baseline:middle')
-	 		else:
-	 			text = ET.Element('text', x=str(x), y=str(y), fill='black', 
-									style='font-family:Sans-Serif;font-size:16px;text-anchor:left;dominant-baseline:middle')	 		
-	 		text.text = hmmer.name
-	 		text.attrib["id"]=hmmer.accession
-		 		
-	 		if len(hmmer.source)>0 and len(hmmer.accession)>0:
-	 			link.append(text)
-	 			doc.append(link)
-	 		else:
-	 			doc.append(text)
+		if self.titlemode:
+			text = ET.Element('text', x=str(leftMargin), y=str(int(y-fontSize*2.5)), fill='black', 
+								style='font-family:Sans-Serif;font-size:16px;text-anchor:left;dominant-baseline:middle')
+ 		else:
+ 			text = ET.Element('text', x=str(x), y=str(y), fill='black', 
+								style='font-family:Sans-Serif;font-size:16px;text-anchor:left;dominant-baseline:middle')	 		
+ 		text.text = hmmer.name
+ 		text.attrib["id"]=hmmer.accession
+ 		text.attrib["name"]=hmmer.accession
+ 				 		
+ 		if len(hmmer.source)>0 and len(hmmer.accession)>0:
+ 			link.append(text)
+ 			doc.append(link)
+ 		else:
+ 			doc.append(text)
 
-	 		# Draw Line
-	 		line = ET.Element('line', x1=str(leftMargin), y1=str(y), x2=str(leftMargin+int(hmmer.length*conversion)),
-	 							 y2=str(y), style='stroke:rgb(200,200,200);stroke-width:4')
-	 		doc.append(line)
-	 		# Start and End Amino Acid Number
-	 		start = ET.Element('text', x=str(leftMargin-fontSize), y=str(y), fill='black', 
-								style='font-family:Sans-Serif;font-size:13px;text-anchor:right;dominant-baseline:middle')
-	 		start.text = '1'
-	 		doc.append(start)
-	 		end = ET.Element('text', x=str(leftMargin+int(hmmer.length*conversion)), y=str(y), fill='black', 
-								style='font-family:Sans-Serif;font-size:13px;text-anchor:left;dominant-baseline:middle')
-	 		end.text = str(hmmer.length)
-	 		doc.append(end)
-	 		#
-	 		# Draw Domains
-	 		#
-	 		for hit in hmmer.hits:
-	 			if not hit.exclude:
-	 				#
-	 				# if color of domain is not assigned, choose color in table and increase it.
-	 				#
-	 				if not hit.color:
-			 			if hit.name in hmmcolors:
-			 				color = hmmcolors[hit.name]
-			 			else:
-			 				hmmcolors[hit.name]=colors[colorIndex]
-			 				color = colors[colorIndex]
-			 				if colorIndex < len(colors)-1:
-			 					colorIndex+=1
-			 				else:
-			 					colorIndex = 0
-			 		else:
-			 			color = hit.color
+ 		# Draw Line
+ 		line = ET.Element('line', x1=str(leftMargin), y1=str(y), x2=str(leftMargin+int(hmmer.length*conversion)),
+ 							 y2=str(y), style='stroke:rgb(200,200,200);stroke-width:4')
+ 		doc.append(line)
+ 		# Start and End Amino Acid Number
+ 		start = ET.Element('text', x=str(leftMargin-fontSize), y=str(y), fill='black', 
+							style='font-family:Sans-Serif;font-size:13px;text-anchor:right;dominant-baseline:middle')
+ 		start.text = '1'
+ 		doc.append(start)
+ 		end = ET.Element('text', x=str(leftMargin+int(hmmer.length*conversion)), y=str(y), fill='black', 
+							style='font-family:Sans-Serif;font-size:13px;text-anchor:left;dominant-baseline:middle')
+ 		end.text = str(hmmer.length)
+ 		doc.append(end)
+ 		#
+ 		# Draw Domains
+ 		#
+ 		for hit in hmmer.hits:
+ 			if not hit.exclude:
+		 		color = hit.color
+		 		if hit.border :
+		 			border = ';stroke-width:1;stroke:black'
+		 		else:
+		 			border = ''
+		 		if hit.gradient:
+		 			style='fill:url(#'+'gradient_'+hit.color+')'+border
+		 		else:
+		 			style = 'fill:'+color+border
+	 			#
+	 			# Draw rectanglar domains
+	 			#
+	 			link = ET.Element('a')
+	 			link.attrib["xlink:href"]="http://pfam.sanger.ac.uk/family/{0}".format(hit.acc)
+	 			rect = ET.Element('rect', x=str(leftMargin+int(hit.start*conversion)), y=str(y-boxHeight/2),
+	 								 width=str(int((hit.end - hit.start)*conversion)), 
+	 								 height=str(boxHeight), style=style)
+	 			
+	 			if hit.acc:
+	 				link.append(rect)
+	 				doc.append(link)
+	 			else:
+	 				doc.append(rect)
+	 			#
+	 			# Draw Domain Label
+	 			#
+	 			if hit.label:
+		 			font = 13
+		 			if (len(str(hit.name))*font*0.6>(hit.end - hit.start)*conversion):
+						delta = -1*boxHeight
+					else:
+						delta = 0
+					link = ET.Element('a')
+	 				link.attrib["xlink:href"]="http://pfam.sanger.ac.uk/family/{0}".format(hit.acc)
+		 			textLabel = ET.Element('text',x=str(leftMargin+int((hit.start+(hit.end-hit.start)*0.5)*conversion)),y=str(y+delta),fill='black',
+		 									style='font-family:Sans-Serif;font-size:'+str(font)+'px;text-anchor:middle;alignment-baseline:middle')
+	 				textLabel.text = hit.name
+	 				if hit.acc:
+	 					link.append(textLabel)
+	 					doc.append(link)
+	 				else:
+	 					doc.append(textLabel)
+	 			#
+	 			# Draw start and end aa numbers of the domain
+	 			#
+	 			# Adjust location of number based on the domain length
+	 			#
+	 			font=9
+	 			if (leftMargin+hit.start*conversion+font*0.6*(len(str(hit.start))))>(leftMargin+hit.end*conversion-len(str(hit.end))*font*0.6):
+	 				deltaStart = int(font*-0.5*len(str(hit.start)))
+	 				deltaEnd = int(font*0.5*len(str(hit.end)))
+	 			else:
+	 				deltaStart = 0
+	 				deltaEnd = 0
 
-			 		if hit.border :
-			 			border = ';stroke-width:1;stroke:black'
-			 		else:
-			 			border = ''
-			 		if hit.gradient:
-			 			style='fill:url(#'+'gradient_'+hit.color+')'+border
-			 		else:
-			 			style = 'fill:'+color+border
-		 			#
-		 			# Draw rectanglar domains
-		 			#
-		 			link = ET.Element('a')
-		 			link.attrib["xlink:href"]="http://pfam.sanger.ac.uk/family/{0}".format(hit.acc)
-		 			rect = ET.Element('rect', x=str(leftMargin+int(hit.start*conversion)), y=str(y-boxHeight/2),
-		 								 width=str(int((hit.end - hit.start)*conversion)), 
-		 								 height=str(boxHeight), style=style)
-		 			
-		 			if hit.acc:
-		 				link.append(rect)
-		 				doc.append(link)
-		 			else:
-		 				doc.append(rect)
+		 		if hit.startshow:	
+		 			hitStart = ET.Element('text', x=str(leftMargin+int(hit.start*conversion)+deltaStart), y=str(y+boxHeight), fill='black', 
+									style='font-family:Sans-Serif;font-size:'+str(font)+'px;text-anchor:left;dominant-baseline:top')
+			 		hitStart.text = str(hit.start)
+			 		doc.append(hitStart)
 
-		 			#
-		 			# Draw Domain Label
-		 			#
-		 			if hit.label:
-			 			font = 13
-			 			if (len(str(hit.name))*font*0.6>(hit.end - hit.start)*conversion):
-							delta = -1*boxHeight
-						else:
-							delta = 0
-						link = ET.Element('a')
-		 				link.attrib["xlink:href"]="http://pfam.sanger.ac.uk/family/{0}".format(hit.acc)
-			 			textLabel = ET.Element('text',x=str(leftMargin+int((hit.start+(hit.end-hit.start)*0.5)*conversion)),y=str(y+delta),fill='black',
-			 									style='font-family:Sans-Serif;font-size:'+str(font)+'px;text-anchor:middle;alignment-baseline:middle')
-		 				textLabel.text = hit.name
-		 				if hit.acc:
-		 					link.append(textLabel)
-		 					doc.append(link)
-		 				else:
-		 					doc.append(textLabel)
-		 			#
-		 			# Draw start and end aa numbers of the domain
-		 			#
-		 			# Adjust location of number based on the domain length
-		 			#
-		 			font=9
-		 			if (leftMargin+hit.start*conversion+font*0.6*(len(str(hit.start))))>(leftMargin+hit.end*conversion-len(str(hit.end))*font*0.6):
-		 				deltaStart = int(font*-0.5*len(str(hit.start)))
-		 				deltaEnd = int(font*0.5*len(str(hit.end)))
-		 			else:
-		 				deltaStart = 0
-		 				deltaEnd = 0
+				if hit.endshow:		
+			 		hitEnd = ET.Element('text', x=str(leftMargin+int(hit.end*conversion)-len(str(hit.end))*font*0.6+deltaEnd), y=str(y+boxHeight), fill='black', 
+										style='font-family:Sans-Serif;font-size:'+str(font)+'px;text-anchor:right;dominant-baseline:top')
+			 		hitEnd.text = str(hit.end)
+			 		doc.append(hitEnd)
+		return(doc)
 
-			 		if hit.startshow:	
-			 			hitStart = ET.Element('text', x=str(leftMargin+int(hit.start*conversion)+deltaStart), y=str(y+boxHeight), fill='black', 
-										style='font-family:Sans-Serif;font-size:'+str(font)+'px;text-anchor:left;dominant-baseline:top')
-				 		hitStart.text = str(hit.start)
-				 		doc.append(hitStart)
-
-					if hit.endshow:		
-				 		hitEnd = ET.Element('text', x=str(leftMargin+int(hit.end*conversion)-len(str(hit.end))*font*0.6+deltaEnd), y=str(y+boxHeight), fill='black', 
-											style='font-family:Sans-Serif;font-size:'+str(font)+'px;text-anchor:right;dominant-baseline:top')
-				 		hitEnd.text = str(hit.end)
-				 		doc.append(hitEnd)
-
-	 		y+=yDelta
-
-	 	f = open(self.outputfile, 'w')
-		f.write('<?xml version=\"1.0\" standalone=\"no\"?>\n')
-		f.write('<!DOCTYPE svg PUBLIC \"-//W3C//DTD SVG 1.1//EN\"\n')
-		f.write('\"http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd\">\n')
-		f.write('\n'.join(ET.tostringlist(doc)))
-		f.close()
-		return('\n'.join(ET.tostringlist(doc)))
 
 	def processHmmerResults(self):
+
 	#
 	# inject information of input file into hmmerResults 
 	#
@@ -782,9 +783,9 @@ class HmmerScanRunner(object):
 			table = HTMLTable(header = header)
 			for hmmerResult in self.hmmerResults:
 				if hmmerResult.source == 'refseq':
-					linkAddress = "<a id='{0}' href='http://www.ncbi.nlm.nih.gov/protein/{0}'>{0}</a>"
+					linkAddress = "<a href='http://www.ncbi.nlm.nih.gov/protein/{0}'>{0}</a>"
 				if hmmerResult.source == 'uniprot':
-					linkAddress = "<a id='{0}' href='http://www.uniprot.org/uniprot/{0}'>{0}</a>"
+					linkAddress = "<a href='http://www.uniprot.org/uniprot/{0}'>{0}</a>"
 				accession = linkAddress.format(hmmerResult.accession)
 				name = "<a href='#{1}'>{0}</a>".format(hmmerResult.name,hmmerResult.accession)
 				domain = []

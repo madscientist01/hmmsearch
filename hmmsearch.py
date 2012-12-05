@@ -259,8 +259,6 @@ class HmmerSearch(object):
 		self.localHmmDB = kwargs.get('localHmmDB')
 		self.threshold = kwargs.get('threshold')
 		self.species = kwargs.get('species')
-		if self.species:
-			self.speciesFilter=self.species.split('+')
 		self.hits = []
 
 	def runLocal(self):
@@ -373,8 +371,9 @@ class HmmerSearch(object):
 				species = child.get('species')
 				query=""
 				if  (float(evalue)<float(self.cutoff)):
-					if len(self.speciesFilter)>0:
-						if species in self.speciesFilter:
+					if self.species:
+						speciesFilter=self.species.split('+')
+						if species in speciesFilter:
 							hit = HmmerSearchHit(target=name, query=query, desc=desc, acc=acc, acc2=acc2,bitscore=bitscore,
 													evalue=evalue, domainNo=domainNo,species=species)
 							self.hits.append(hit)
