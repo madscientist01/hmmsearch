@@ -446,14 +446,16 @@ def main(argument):
 	if argument.local:
 		fastaFileNames = extractMultiFasta(argument.proteindb,ids)
 		inputFileName = generateInputFile(proteinNames,fastaFileNames,'test.INP')
-		db = hmmdb
 	else:
 		fastaFileNames = fetchFasta(ids,argument.proteindb)
 		inputFileName = generateInputFile(proteinNames,fastaFileNames,'test.INP')
+	if argument.localscan:
+		db = argument.hmmdb
+	else:
 		db = 'pfam'
 
 	hmmerscan = HmmerScanRunner(files=fastaFileNames.values(), db=db, evalue=argument.evalue,inputFileName=inputFileName,
-								local = argument.local, outputfile = 'output.svg', threshold=argument.threshold, 
+								local = argument.localscan, outputfile = 'output.svg', threshold=argument.threshold, 
 								titlemode=True )
 	hmmerscan.run()
 
@@ -472,6 +474,8 @@ if __name__ == "__main__":
 						help='E-value cutoff')
 	parser.add_argument('-l', '--local',action='store_true', dest='local', default=False, 
 						help='run local Hmmer')
+	parser.add_argument('-ls', '--local_scan',action='store_true', dest='localscan', default=False, 
+						help='run local Hmmerscan')
 	parser.add_argument('-t', '--no_threshold', dest='threshold',action='store_false', default=True,
 						help='Turn of Pfam gathering threshold. Enable to look up more weak(unreliable) domains')
 	parser.add_argument('-s', '--species', dest='species',

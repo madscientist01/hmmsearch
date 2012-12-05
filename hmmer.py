@@ -438,7 +438,7 @@ class HmmerScanRunner(object):
 		# Draw SVG based on the hmmer domaim
 		#
 		x = 50
-		y = 50
+		y = 70
 		leftMargin = 150
 		rightMargin = 100
 		fontSize = 16
@@ -478,8 +478,7 @@ class HmmerScanRunner(object):
 			yDelta = 60	
 		canvasHeight = len(self.hmmerResults)*yDelta+100
 		doc = ET.Element('svg', width=str(canvasWidth), height=str(canvasHeight), version='1.2', xmlns='http://www.w3.org/2000/svg')
-		doc.attrib["xmlns:xlink"]="http://www.w3.org/1999/xlink"
-		doc.attrib["xmlns:svg"]="'http://www.w3.org/2000/svg'"		
+		doc.attrib["xmlns:xlink"]="http://www.w3.org/1999/xlink"	
 		defs = self.colorDef()
 		doc.append(defs)
 		
@@ -564,11 +563,11 @@ class HmmerScanRunner(object):
 
 
 		if self.titlemode:
-			text = ET.Element('text', x=str(leftMargin), y=str(int(y-fontSize*2.5)), fill='black', 
-								style='font-family:Sans-Serif;font-size:16px;text-anchor:left;dominant-baseline:middle')
+			text = ET.Element('text', x=str(leftMargin-fontSize), y=str(int(y-fontSize*2.5)), fill='black', 
+								style='font-family:Sans-Serif;font-weight:bold;font-size:16px;text-anchor:left;dominant-baseline:middle')
  		else:
  			text = ET.Element('text', x=str(x), y=str(y), fill='black', 
-								style='font-family:Sans-Serif;font-size:16px;text-anchor:left;dominant-baseline:middle')	 		
+								style='font-family:Sans-Serif;font-weight:bold;font-size:16px;text-anchor:left;dominant-baseline:middle')	 		
  		text.text = hmmer.name
  		text.attrib["id"]=hmmer.accession
  		text.attrib["name"]=hmmer.accession
@@ -628,11 +627,15 @@ class HmmerScanRunner(object):
 		 			if (len(str(hit.name))*font*0.6>(hit.end - hit.start)*conversion):
 						delta = -1*boxHeight
 					else:
-						delta = 0
+						delta = int (boxHeight/3.5)
 					link = ET.Element('a')
 	 				link.attrib["xlink:href"]="http://pfam.sanger.ac.uk/family/{0}".format(hit.acc)
-		 			textLabel = ET.Element('text',x=str(leftMargin+int((hit.start+(hit.end-hit.start)*0.5)*conversion)),y=str(y+delta),fill='black',
-		 									style='font-family:Sans-Serif;font-size:'+str(font)+'px;text-anchor:middle;alignment-baseline:middle')
+		 		# 	textLabel = ET.Element('text',x=str(leftMargin+int((hit.start+(hit.end-hit.start)*0.5)*conversion)),y=str(y+delta),fill='black',
+		 		# 							style='font-family:Sans-Serif;font-size:'+str(font)+'px;text-anchor:middle;alignment-baseline:middle')
+					textLabel = ET.Element('text',x=str(leftMargin+int((hit.start+(hit.end-hit.start)*0.5)*conversion)),y=str(y+delta),fill='black',
+		 									style='font-family:Sans-Serif;font-size:'+str(font)+'px;text-anchor:middle')
+
+
 	 				textLabel.text = hit.name
 	 				if hit.acc:
 	 					link.append(textLabel)
@@ -777,11 +780,13 @@ class HmmerScanRunner(object):
 				if hmmer.runRemote():
 					self.hmmerResults.append(hmmer)
 		if len(self.hmmerResults)>0:
-			self.processHmmerResults()		
+			self.processHmmerResults()
+			self.hmmerResults.sort(key=lambda x:x.name)		
 			svg=self.drawSVG()
 			header = ['Accession','Name','Domain','length']
 			table = HTMLTable(header = header)
 			for hmmerResult in self.hmmerResults:
+				print hmmerResult.name
 				if hmmerResult.source == 'refseq':
 					linkAddress = "<a href='http://www.ncbi.nlm.nih.gov/protein/{0}'>{0}</a>"
 				if hmmerResult.source == 'uniprot':
