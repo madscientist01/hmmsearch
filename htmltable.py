@@ -41,8 +41,8 @@ class HTMLTable(object):
 		self.style = """
 		<style>
 		table{
-		    font-family: "Lucida Sans Unicode", "Lucida Grande", Sans-Serif;
-		    font-size: 11px;
+		    font-family: "Arial",Sans-Serif;
+		    font-size: 12px;
 		    #margin: 45px;
 		    width:1000px;
 		    text-align: left;
@@ -57,7 +57,10 @@ class HTMLTable(object):
 			padding: 10px;
 		    align :center;
 			background-color: #FFFFFF;
-			}		
+			}
+		div {
+			margin: 0px 0px 0px 0px
+		}		
 		</style>
 		<body>
 """

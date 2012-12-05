@@ -419,45 +419,49 @@ def main(argument):
 
 	ids = []
 	proteinNames = {}
-	for hmmFile in hmmFiles:
-		hmmSearch = HmmerSearch(file=hmmFile, db=argument.proteindb, evalue=argument.evalue, threshold=threshold, species=argument.species)
+	if len(hmmFiles)>0:
+		for hmmFile in hmmFiles:
+			hmmSearch = HmmerSearch(file=hmmFile, db=argument.proteindb, evalue=argument.evalue, threshold=threshold, species=argument.species)
+			if argument.local:
+				hmmSearch.runLocal()
+				for hit in hmmSearch.hits:
+					id =hit.target+' '+hit.desc.strip()
+					ids.append(id)
+					if not id in proteinNames:
+						proteinNames[id] = hit.desc.strip()
+			else:
+				hmmSearch.runRemote()
+				for hit in hmmSearch.hits:
+					if hit.acc2:
+						id=hit.acc2
+					else:
+						id=hit.acc
+					ids.append(id)
+					if not id in proteinNames:
+						proteinNames[id] = hit.desc.strip()+'['+hit.species+']'
+				
+		## Bug fix needed,
+
+		print "# of hits :{0}".format(len(hmmSearch.hits))
+		
 		if argument.local:
-			hmmSearch.runLocal()
-			for hit in hmmSearch.hits:
-				id =hit.target+' '+hit.desc.strip()
-				ids.append(id)
-				if not id in proteinNames:
-					proteinNames[id] = hit.desc.strip()
+			fastaFileNames = extractMultiFasta(argument.proteindb,ids)
+			inputFileName = generateInputFile(proteinNames,fastaFileNames,'test.INP')
 		else:
-			hmmSearch.runRemote()
-			for hit in hmmSearch.hits:
-				if hit.acc2:
-					id=hit.acc2
-				else:
-					id=hit.acc
-				ids.append(id)
-				if not id in proteinNames:
-					proteinNames[id] = hit.desc.strip()+'['+hit.species+']'
-			
-	## Bug fix needed,
+			fastaFileNames = fetchFasta(ids,argument.proteindb)
+			inputFileName = generateInputFile(proteinNames,fastaFileNames,'test.INP')
+		if argument.localscan:
+			db = argument.hmmdb
+		else:
+			db = 'pfam'
 
-	print "# of hits :{0}".format(len(hmmSearch.hits))
-	
-	if argument.local:
-		fastaFileNames = extractMultiFasta(argument.proteindb,ids)
-		inputFileName = generateInputFile(proteinNames,fastaFileNames,'test.INP')
+		hmmerscan = HmmerScanRunner(files=fastaFileNames.values(), db=db, evalue=argument.evalue,inputFileName=inputFileName,
+									local = argument.localscan, outputfile = 'output.svg', threshold=argument.threshold, 
+									titlemode=True )
+		hmmerscan.run()
 	else:
-		fastaFileNames = fetchFasta(ids,argument.proteindb)
-		inputFileName = generateInputFile(proteinNames,fastaFileNames,'test.INP')
-	if argument.localscan:
-		db = argument.hmmdb
-	else:
-		db = 'pfam'
-
-	hmmerscan = HmmerScanRunner(files=fastaFileNames.values(), db=db, evalue=argument.evalue,inputFileName=inputFileName,
-								local = argument.localscan, outputfile = 'output.svg', threshold=argument.threshold, 
-								titlemode=True )
-	hmmerscan.run()
+		print "Nothing to do!"
+		sys.exit()
 
 
 if __name__ == "__main__":

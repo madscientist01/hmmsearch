@@ -64,8 +64,6 @@ def readAccession(filename) :
 		f.close()
 	return(db, accession)	    	
 	
-
-
 def fetchfromUniprot(uniprotId):
 	#
 	# fetch fasta file using Rest interface of uniprot 
@@ -254,6 +252,20 @@ class SmartRedirectHandler(urllib2.HTTPRedirectHandler):
     def http_error_302(self, req, fp, code, msg, headers):
         return headers
 
+class SVGList(object):
+
+	def __init__(self):
+
+		self.header = "<br>"
+		self.footer = "<br>"
+		self.svgEmbeddingTemplate = """
+<div id="{0}">{1}</div>
+"""
+		self.svgEmbedContent=""
+		
+	def svgContentFill(self,svgContent):
+		fill = self.svgEmbeddingTemplate.format(*svgContent)
+		self.svgEmbedContent = self.svgEmbedContent+fill
 
 class Hmmer(object):
 	#
@@ -432,38 +444,48 @@ class HmmerScanRunner(object):
 		self.hmmerResults = []
 		self.titlemode = kwargs.get('titlemode',False)
 	
+	def maxLength(self):
+		maxTitleLength = 0
+		maxLength = 0
+		for hmmerResult in self.hmmerResults:
+			if hmmerResult.length>maxLength:
+				maxLength=hmmerResult.length
+			if len(hmmerResult.name)>maxTitleLength:
+				maxTitleLength = len(hmmerResult.name)
+			if maxLength< hmmerResult.length:
+				maxLength= hmmerResult.length
+		return(maxLength,maxTitleLength)
+
+	def saveSVG(self,filename,doc):
+		#
+		# Save SVG based on the ElementTreeDoc
+		#
+		f = open(filename, 'w')
+		f.write('<?xml version=\"1.0\" standalone=\"no\"?>\n')
+		f.write('<!DOCTYPE svg PUBLIC \"-//W3C//DTD SVG 1.1//EN\"\n')
+		f.write('\"http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd\">\n')
+		f.write('\n'.join(ET.tostringlist(doc)))
+		f.close()
+		return()
 
 	def drawSVG(self):
-		#
+		
 		# Draw SVG based on the hmmer domaim
-		#
 		x = 50
 		y = 70
 		leftMargin = 150
 		rightMargin = 100
 		fontSize = 16
-		maxLength = 0
-		maxTitleLength = 0
 		boxHeight = 20
-		maxLength = 0
-		for hmmerResult in self.hmmerResults:
-			if hmmerResult.length>maxLength:
-				maxlength=hmmerResult.length
-			if len(hmmerResult.name)>maxTitleLength:
-				maxTitleLength = len(hmmerResult.name)
-			if maxLength< hmmerResult.length:
-				maxLength= hmmerResult.length
-
-		canvasWidth=int(maxlength*0.7)	
+		maxLength,maxTitleLength = self.maxLength()
+		canvasWidth=int(maxLength*0.7)	
 		effectiveWidth = canvasWidth -leftMargin - rightMargin		
-		#
+		
 		# In Python 2.x, int division by int is int. but it became float in Python 3.*. 
 		#  from __future__ import division	was used 
-		#
+		
 		conversion = effectiveWidth / maxLength
-		#
 		# If protein name width is bigger than leftMargin, wrote Label at top of proteins (self.titlemode=True)
-		#
 		if maxTitleLength*fontSize*conversion*0.7 > leftMargin:
 			self.titlemode = True
 		else:
@@ -476,24 +498,69 @@ class HmmerScanRunner(object):
 			conversion = effectiveWidth / maxLength
 		else:
 			yDelta = 60	
+
 		canvasHeight = len(self.hmmerResults)*yDelta+100
+		# doc is elementTree container for svg
 		doc = ET.Element('svg', width=str(canvasWidth), height=str(canvasHeight), version='1.2', xmlns='http://www.w3.org/2000/svg')
 		doc.attrib["xmlns:xlink"]="http://www.w3.org/1999/xlink"	
+		# Color and Gradient Assignment
 		defs = self.colorDef()
 		doc.append(defs)
 		
+		#Draw several domain architecture in single SVG
 		for hmmer in self.hmmerResults:
-			# Draw Protein Text
 			doc = self.singleSVG(hmmer,doc,x,y,leftMargin,fontSize,conversion,boxHeight)
 	 		y+=yDelta
 
-	 	f = open(self.outputfile, 'w')
-		f.write('<?xml version=\"1.0\" standalone=\"no\"?>\n')
-		f.write('<!DOCTYPE svg PUBLIC \"-//W3C//DTD SVG 1.1//EN\"\n')
-		f.write('\"http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd\">\n')
-		f.write('\n'.join(ET.tostringlist(doc)))
-		f.close()
+	 	self.saveSVG(self.outputfile,doc)
 		return('\n'.join(ET.tostringlist(doc)))
+	
+
+	def drawMultiSVG(self):
+		
+		# Draw SVG based on the hmmer domaim
+		x = 50
+		y = 60
+		leftMargin = 150
+		rightMargin = 100
+		fontSize = 16
+		boxHeight = 20
+		maxLength,maxTitleLength = self.maxLength()
+		canvasWidth=int(maxLength*0.7)	
+		canvasHeight = 110
+		effectiveWidth = canvasWidth -leftMargin - rightMargin		
+		conversion = effectiveWidth / maxLength
+		svgFileNames = {}
+		svgContent = {}
+		# If protein name width is bigger than leftMargin, wrote Label at top of proteins (self.titlemode=True)
+	
+		if maxTitleLength*fontSize*conversion*0.7 > leftMargin:
+			self.titlemode = True
+		else:
+			self.titlemode = False
+
+		if self.titlemode:
+			leftMargin = 20
+			effectiveWidth = canvasWidth -leftMargin - rightMargin
+			conversion = effectiveWidth / maxLength
+		#
+		# Draw several SVGs per each protein
+		#
+		for hmmer in self.hmmerResults:
+			doc = ET.Element('svg', width=str(canvasWidth), height=str(canvasHeight), version='1.2', xmlns='http://www.w3.org/2000/svg')
+			doc.attrib["xmlns:xlink"]="http://www.w3.org/1999/xlink"	
+			# Color and Gradient Assignment
+			defs = self.colorDef()
+			doc.append(defs)
+			doc = self.singleSVG(hmmer,doc,x,y,leftMargin,fontSize,conversion,boxHeight)
+			if hmmer.accession:
+				svgFileName = hmmer.accession+".svg"
+			else:
+				svgFileName = hmmer.name+".svg"
+	 		self.saveSVG(svgFileName,doc)
+	 		svgFileNames[hmmer.name]=svgFileName
+	 		svgContent[hmmer.name]=ET.tostring(doc)
+		return(svgFileNames,svgContent)
 
 
 	def colorDef(self):
@@ -634,8 +701,6 @@ class HmmerScanRunner(object):
 		 		# 							style='font-family:Sans-Serif;font-size:'+str(font)+'px;text-anchor:middle;alignment-baseline:middle')
 					textLabel = ET.Element('text',x=str(leftMargin+int((hit.start+(hit.end-hit.start)*0.5)*conversion)),y=str(y+delta),fill='black',
 		 									style='font-family:Sans-Serif;font-size:'+str(font)+'px;text-anchor:middle')
-
-
 	 				textLabel.text = hit.name
 	 				if hit.acc:
 	 					link.append(textLabel)
@@ -655,17 +720,30 @@ class HmmerScanRunner(object):
 	 				deltaStart = 0
 	 				deltaEnd = 0
 
+
+	 			startEndLink = ET.Element('a')
+	 			startEndLink.attrib["xlink:href"]="http://www.uniprot.org/blast/?about={0}[{1}-{2}]".format(hmmer.accession, hit.start, hit.end)
+	 			
+
 		 		if hit.startshow:	
 		 			hitStart = ET.Element('text', x=str(leftMargin+int(hit.start*conversion)+deltaStart), y=str(y+boxHeight), fill='black', 
 									style='font-family:Sans-Serif;font-size:'+str(font)+'px;text-anchor:left;dominant-baseline:top')
 			 		hitStart.text = str(hit.start)
-			 		doc.append(hitStart)
+			 		if hmmer.source == 'uniprot':
+						startEndLink.append(hitStart)
+						doc.append(startEndLink)
+					else:
+			 			doc.append(hitStart)
 
 				if hit.endshow:		
 			 		hitEnd = ET.Element('text', x=str(leftMargin+int(hit.end*conversion)-len(str(hit.end))*font*0.6+deltaEnd), y=str(y+boxHeight), fill='black', 
 										style='font-family:Sans-Serif;font-size:'+str(font)+'px;text-anchor:right;dominant-baseline:top')
 			 		hitEnd.text = str(hit.end)
-			 		doc.append(hitEnd)
+			 		if hmmer.source == 'uniprot':
+						startEndLink.append(hitEnd)
+						doc.append(startEndLink)
+					else:
+			 			doc.append(hitEnd)
 		return(doc)
 
 
@@ -782,25 +860,36 @@ class HmmerScanRunner(object):
 		if len(self.hmmerResults)>0:
 			self.processHmmerResults()
 			self.hmmerResults.sort(key=lambda x:x.name)		
-			svg=self.drawSVG()
+			self.drawSVG()
+			(svgFileNames,svgContent) = self.drawMultiSVG()
 			header = ['Accession','Name','Domain','length']
 			table = HTMLTable(header = header)
+			svgList = SVGList()
+		
 			for hmmerResult in self.hmmerResults:
 				print hmmerResult.name
 				if hmmerResult.source == 'refseq':
 					linkAddress = "<a href='http://www.ncbi.nlm.nih.gov/protein/{0}'>{0}</a>"
 				if hmmerResult.source == 'uniprot':
 					linkAddress = "<a href='http://www.uniprot.org/uniprot/{0}'>{0}</a>"
-				accession = linkAddress.format(hmmerResult.accession)
-				name = "<a href='#{1}'>{0}</a>".format(hmmerResult.name,hmmerResult.accession)
+				accessionLink = linkAddress.format(hmmerResult.accession)
+				nameLink = "<a href='#{1}'>{0}</a>".format(hmmerResult.name,hmmerResult.accession)
 				domain = []
 
 				for hit in hmmerResult.hits:
 					domainName="<a href='http://pfam.sanger.ac.uk/family/{0}'>{1}</a>".format(hit.acc, hit.name)
+					startEnd = "({0}-{1})".format(hit.start, hit.end)
+					if hmmerResult.source =='uniprot':
+						startEndLink = "<a href='http://www.uniprot.org/blast/?about={0}[{1}-{2}]'>{3}</a>".format(hmmerResult.accession, hit.start, hit.end, startEnd)
+					else:
+						startEndLink = startEnd
+					domainName = domainName + startEndLink
 					domain.append(domainName)
 				domains=','.join(domain)
 				length = hmmerResult.length			
-				table.tableContentFill([accession, name, domains, length])
+				table.tableContentFill([accessionLink, nameLink, domains, length])
+				svgList.svgContentFill([hmmerResult.accession,svgContent[hmmerResult.name]])
+			svg = svgList.svgEmbedContent
 			table.extra = "<div>"+svg+"</div>"
 			table.tableGenerate('test.html')
 
