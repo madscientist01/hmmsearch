@@ -15,6 +15,7 @@ import re
 import glob
 import sys
 import subprocess
+from htmltable import HTMLTable
 
 def readFasta(filename) :
 	#
@@ -32,7 +33,8 @@ def readFasta(filename) :
 			if match:
 				sequenceName = match.group(1)
 			else:
-				sequence = sequence+line			
+				sequence = sequence+line
+		f.close()			
 		return(sequenceName,sequence)	    	
 	else:
 		return(None)
@@ -59,7 +61,7 @@ def readAccession(filename) :
 			if uniprotMatch:
 				db = "uniprot"
 				accession = uniprotMatch.group(1)	
-
+		f.close()
 	return(db, accession)	    	
 	
 
@@ -529,6 +531,11 @@ class HmmerScanRunner(object):
 				if hmmer.source == 'uniprot':
 					linkAddress = "http://www.uniprot.org/uniprot/{0}"
 
+
+				anchor = ET.Element('a')
+		 	 	anchor.attrib["xlink:href"]="#"+hmmer.accession
+		 	 	doc.append(anchor)
+
 				link = ET.Element('a')
 		 		link.attrib["xlink:href"]=linkAddress.format(hmmer.accession)
 
@@ -538,9 +545,10 @@ class HmmerScanRunner(object):
 									style='font-family:Sans-Serif;font-size:16px;text-anchor:left;dominant-baseline:middle')
 	 		else:
 	 			text = ET.Element('text', x=str(x), y=str(y), fill='black', 
-									style='font-family:Sans-Serif;font-size:16px;text-anchor:left;dominant-baseline:middle')
-	 		
+									style='font-family:Sans-Serif;font-size:16px;text-anchor:left;dominant-baseline:middle')	 		
 	 		text.text = hmmer.name
+	 		text.attrib["id"]=hmmer.accession
+		 		
 	 		if len(hmmer.source)>0 and len(hmmer.accession)>0:
 	 			link.append(text)
 	 			doc.append(link)
@@ -654,9 +662,9 @@ class HmmerScanRunner(object):
 		f.write('<?xml version=\"1.0\" standalone=\"no\"?>\n')
 		f.write('<!DOCTYPE svg PUBLIC \"-//W3C//DTD SVG 1.1//EN\"\n')
 		f.write('\"http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd\">\n')
-		f.write(ET.tostring(doc))
+		f.write('\n'.join(ET.tostringlist(doc)))
 		f.close()
-		return
+		return('\n'.join(ET.tostringlist(doc)))
 
 	def processHmmerResults(self):
 	#
@@ -758,6 +766,7 @@ class HmmerScanRunner(object):
 			threshold = "cut_ga"
 		else:
 			threshold = "No"
+
 		for file in files:
 			hmmer = Hmmer(file=file,db=self.db,evalue=self.evalue,threshold=threshold)
 			if self.local:
@@ -768,7 +777,26 @@ class HmmerScanRunner(object):
 					self.hmmerResults.append(hmmer)
 		if len(self.hmmerResults)>0:
 			self.processHmmerResults()		
-			self.drawSVG()
+			svg=self.drawSVG()
+			header = ['Accession','Name','Domain','length']
+			table = HTMLTable(header = header)
+			for hmmerResult in self.hmmerResults:
+				if hmmerResult.source == 'refseq':
+					linkAddress = "<a id='{0}' href='http://www.ncbi.nlm.nih.gov/protein/{0}'>{0}</a>"
+				if hmmerResult.source == 'uniprot':
+					linkAddress = "<a id='{0}' href='http://www.uniprot.org/uniprot/{0}'>{0}</a>"
+				accession = linkAddress.format(hmmerResult.accession)
+				name = "<a href='#{1}'>{0}</a>".format(hmmerResult.name,hmmerResult.accession)
+				domain = []
+
+				for hit in hmmerResult.hits:
+					domainName="<a href='http://pfam.sanger.ac.uk/family/{0}'>{1}</a>".format(hit.acc, hit.name)
+					domain.append(domainName)
+				domains=','.join(domain)
+				length = hmmerResult.length			
+				table.tableContentFill([accession, name, domains, length])
+			table.extra = "<div>"+svg+"</div>"
+			table.tableGenerate('test.html')
 
 if __name__ == "__main__":
 	
