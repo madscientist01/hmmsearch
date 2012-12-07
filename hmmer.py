@@ -8,6 +8,7 @@
 from __future__ import division
 import urllib
 import urllib2
+from urllib2 import HTTPError
 import os
 import xml.etree.cElementTree as ET
 import argparse
@@ -54,8 +55,18 @@ class Hmmer(object):
 		self.cutoff=kwargs.get('evalue')
 		self.localHmmDB = kwargs.get('localHmmDB')
 		self.threshold = kwargs.get('threshold')
-		(self.name, self.sequence) = readFasta(self.file)
-		(self.source,self.accession)= readAccession(self.file)
+		fasta = readFasta(self.file)
+		if fasta:
+			(self.name, self.sequence) = fasta
+		else:
+			self.name = None
+			self.sequence = None
+		accession = readAccession(self.file)
+		if accession:
+			(self.source,self.accession)= accession
+		else:
+			self.source = None
+			self.accession = None
 		self.length=len(self.sequence)
 		self.features = {}
 		hits=[]
@@ -105,55 +116,59 @@ class Hmmer(object):
 		              'seq':self.sequence
 		             }
 		enc_params = urllib.urlencode(parameters);
-		#post the seqrch request to the server
-		request = urllib2.Request('http://hmmer.janelia.org/search/hmmscan',enc_params)
-		#get the url where the results can be fetched from
-		results_url = urllib2.urlopen(request).getheader('location')
-		# modify the range, format and presence of alignments in your results here
-		res_params = {
-		              'output':'xml'
-		             }
-		# add the parameters to your request for the results
-		enc_res_params = urllib.urlencode(res_params)
-		modified_res_url = results_url + '?' + enc_res_params
-		# send a GET request to the server
-		results_request = urllib2.Request(modified_res_url)
-		data = urllib2.urlopen(results_request)
-		# print out the results
-		result = data.read()	
-		if result:
-			#
-			# Parse using ElementTree Modules (http://docs.python.org/2/library/xml.etree.elementtree.html)
-			#
-			f=open(self.file+".xml", "w")
-			f.write(result)
-			f.close()
-			root = ET.fromstring(result)
-			for child in root.iter('hits'):
-			
-				name = child.get('name')
-				desc = child.get('desc')
-				acc = child.get('acc')
-				evalue=child.get('evalue')				
-			
-				for element in child.iter('domains'):
-			
-					if (float(element.get('ievalue'))<float(self.cutoff)):
-						cevalue = element.get('cevalue')
-						ievalue = element.get('ievalue')
-						start = element.get('iali')
-						end = element.get('jali')
-						bitscore = element.get('bitscore')
-						hit = HmmerHit(	name=name, desc=desc, acc=acc,bitscore=bitscore,
-										evalue=evalue, ievalue=ievalue, cevalue=cevalue, start=start, end=end)
-						self.features['domain'].append(hit)
+		
+		try:
+			#post the seqrch request to the server
+			request = urllib2.Request('http://hmmer.janelia.org/search/hmmscan',enc_params)
+			#get the url where the results can be fetched from
+			results_url = urllib2.urlopen(request).getheader('location')
+			# modify the range, format and presence of alignments in your results here
+			res_params = {
+			              'output':'xml'
+			             }	            
+			# add the parameters to your request for the results
+			enc_res_params = urllib.urlencode(res_params)
+			modified_res_url = results_url + '?' + enc_res_params
+			# send a GET request to the server
+			results_request = urllib2.Request(modified_res_url)
+			data = urllib2.urlopen(results_request)
+			# print out the results
+			result = data.read()	
+			if result:
+				#
+				# Parse using ElementTree Modules (http://docs.python.org/2/library/xml.etree.elementtree.html)
+				#
+				f=open(self.file+".xml", "w")
+				f.write(result)
+				f.close()
+				root = ET.fromstring(result)
+				for child in root.iter('hits'):
+				
+					name = child.get('name')
+					desc = child.get('desc')
+					acc = child.get('acc')
+					evalue=child.get('evalue')				
+				
+					for element in child.iter('domains'):
+				
+						if (float(element.get('ievalue'))<float(self.cutoff)):
+							cevalue = element.get('cevalue')
+							ievalue = element.get('ievalue')
+							start = element.get('iali')
+							end = element.get('jali')
+							bitscore = element.get('bitscore')
+							hit = HmmerHit(	name=name, desc=desc, acc=acc,bitscore=bitscore,
+											evalue=evalue, ievalue=ievalue, cevalue=cevalue, start=start, end=end)
+							self.features['domain'].append(hit)
 
-			self.exclude()
-			return(True)
-		else:
-			print "Failed to retrieve results" 
+				self.exclude()
+				return(True)
+			else:
+				print "Failed to retrieve results" 
+				return(False)
+		except HTTPError:
+			print "Hmmscan error"
 			return(False)
-
 	def runLocal(self):
 		#
 		# Using Hmmscan in locally installed Hmmer3 packages, find locations of domains in the Fasta sequence and store 
@@ -342,7 +357,6 @@ class HmmerScanRunner(object):
 			self.local = self.inputFile.local
 			self.evalue = self.inputFile.evalue
 			self.outputHTML = self.inputFile.outputHTML
-			print self.outputHTML
 			self.outputSVG = self.inputFile.outputSVG
 		else:
 			if not self.files:
@@ -374,15 +388,19 @@ class HmmerScanRunner(object):
 			svgList = SVGList()
 		
 			for hmmerResult in self.hmmerResults:
-				print hmmerResult.name
+				print hmmerResult.name, hmmerResult.accession, hmmerResult.source
 				if hmmerResult.source == 'refseq':
 					linkAddress = "<a href='http://www.ncbi.nlm.nih.gov/protein/{0}'>{0}</a>"
 				if hmmerResult.source == 'uniprot':
 					linkAddress = "<a href='http://www.uniprot.org/uniprot/{0}'>{0}</a>"
-				accessionLink = linkAddress.format(hmmerResult.accession)
-				nameLink = "<a href='#{1}'>{0}</a>".format(hmmerResult.name,hmmerResult.accession)
-				domain = []
+				if hmmerResult.source in ['refseq', 'uniprot']:
+					accessionLink = linkAddress.format(hmmerResult.accession)
+					nameLink = "<a href='#{1}'>{0}</a>".format(hmmerResult.name,hmmerResult.accession)
+				else:
+					accessionLink = ""
+					nameLink = ""
 
+				domain = []
 				for hit in hmmerResult.features['domain']:
 					if hit.acc:
 						domainName="<a href='http://pfam.sanger.ac.uk/family/{0}'>{1}</a>".format(hit.acc, hit.name)

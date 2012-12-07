@@ -327,8 +327,7 @@ class HmmerSearch(object):
 		print "search {0} in remote database".format(self.file)
 		if not self.db in ['uniprotkb','swissprot','nr','uniprotrefprot','rp15','env_nr','pdb', 'rp35', 'rp55', 'rp75']:
 			print "invalid db. It should be uniprotkb,swissprot,nr, uniprotrefprot, rp15, env_nr, pdb, rp35, rp55 or rp75"
-			print "search will be carried out with swissprot"
-			self.db = 'swissprot'
+			sys.exit()
 
 		parameters = {
 		              'seqdb':self.db,
@@ -475,8 +474,8 @@ if __name__ == "__main__":
 	parser = argparse.ArgumentParser()
 	parser.add_argument('-d', '--domains', nargs='+', dest='domains',default=[],
 	                    help='Domains to search')
-	parser.add_argument('-hd', '--hmm', dest='hmmFiles',default = [], help='HMM db')
-	parser.add_argument('-p', '--proteindb', dest='proteindb', default = 'protein.fa',
+	parser.add_argument('-hd', '--hmm', dest='hmmFiles',default = [], help='HMM query File')
+	parser.add_argument('-p', '--proteindb', dest='proteindb', default = 'swissprot',
 						help='protein db')
 	parser.add_argument('-b', '--hmmdb', dest='hmmdb', default = 'Pfam-A.hmm',
 						help='protein db')
@@ -491,5 +490,6 @@ if __name__ == "__main__":
 	parser.add_argument('-s', '--species', dest='species',
 						help='Confine search species. ex: Arabidopsis thaliana+Homo sapiens')
 	results = parser.parse_args()
+
 	main(results)
 

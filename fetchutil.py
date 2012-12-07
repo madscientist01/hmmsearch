@@ -29,14 +29,16 @@ def readAccession(filename) :
 	# From FASTA header, guess accession number and source
 	#
 	refseqRegex = re.compile('>gi\|(\S+)\|ref\|(\S+)\|')
-	uniprotRegex = re.compile('>sp\|(\S+)\|(\S+)')
+	uniprotRegex = re.compile('>(sp|tr)\|(\S+)\|')
 	db = ""
 	accession = ""
+
 	if os.path.exists(filename):		
 		f = open(filename)
 		line = f.readline().strip()
 		if not line: 
 			return(None) 
+		print line
 		refSeqMatch = refseqRegex.match(line)
 		if refSeqMatch:
 			db = "refseq"
@@ -44,9 +46,11 @@ def readAccession(filename) :
 		else:
 			uniprotMatch = uniprotRegex.match(line)
 			if uniprotMatch:
+				print "match"
 				db = "uniprot"
-				accession = uniprotMatch.group(1)	
+				accession = uniprotMatch.group(2)	
 		f.close()
+		print db, accession
 	return(db, accession)	    	
 	
 def fetchfromUniprot(uniprotId):
