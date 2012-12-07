@@ -1,4 +1,17 @@
 import xml.etree.cElementTree as ET
+import re
+
+def splitsentence(word):
+	wordlist = re.split("(\W+)",word)
+	wordcount = len(wordlist)
+	splited = []
+	divpoint = wordcount //2
+	if wordcount > 2:
+		splited.append(' '.join(wordlist[:divpoint]))
+		splited.append(' '.join(wordlist[divpoint+1:]))
+	else:
+		splited.append(word)
+	return(splited)
 
 class SVGDrawer(object):
 	#
@@ -9,6 +22,7 @@ class SVGDrawer(object):
 		self.outputSVG = kwargs.get('outputSVG')
 		self.hmmerResults = kwargs.get('hmmerResults')
 		self.titlemode = kwargs.get('titlemode',False)
+		self.scaleFactor = kwargs.get('scaleFactor',1.5)
 	
 	def maxLength(self):
 		maxTitleLength = 0
@@ -39,12 +53,12 @@ class SVGDrawer(object):
 		# Draw SVG based on the hmmer domaim
 		x = 50
 		y = 70
-		leftMargin = 150
+		leftMargin = 200
 		rightMargin = 100
 		fontSize = 16
 		boxHeight = 20
 		maxLength,maxTitleLength = self.maxLength()
-		canvasWidth=int(maxLength*0.7)	
+		canvasWidth=int(maxLength*self.scaleFactor)	
 		effectiveWidth = canvasWidth -leftMargin - rightMargin		
 		
 		
@@ -56,12 +70,12 @@ class SVGDrawer(object):
 			self.titlemode = False
 
 		if self.titlemode:
-			yDelta=120
-			leftMargin = 20
+			yDelta=110+boxHeight*len(self.hmmerResults[0].tier)
+			leftMargin = 50
 			effectiveWidth = canvasWidth -leftMargin - rightMargin
 			conversion = float(effectiveWidth) / float(maxLength)
 		else:
-			yDelta = 60	
+			yDelta = 80
 
 		canvasHeight = len(self.hmmerResults)*yDelta+100
 		# doc is elementTree container for svg
@@ -84,13 +98,13 @@ class SVGDrawer(object):
 		# Draw SVG based on the hmmer domaim
 		x = 50
 		y = 60
-		leftMargin = 150
+		leftMargin = 200
 		rightMargin = 100
 		fontSize = 16
 		boxHeight = 20
 		maxLength,maxTitleLength = self.maxLength()
-		canvasWidth=int(maxLength*0.7)	
-		canvasHeight = 110
+		canvasWidth=int(maxLength*self.scaleFactor)	
+		canvasHeight = 110+boxHeight*len(self.hmmerResults[0].tier)
 		effectiveWidth = canvasWidth -leftMargin - rightMargin		
 		conversion = float(effectiveWidth) / float(maxLength)
 		svgFileNames = {}
@@ -103,7 +117,7 @@ class SVGDrawer(object):
 			self.titlemode = False
 
 		if self.titlemode:
-			leftMargin = 20
+			leftMargin = 50
 			effectiveWidth = canvasWidth -leftMargin - rightMargin
 			conversion = float(effectiveWidth) / float(maxLength)
 		#
@@ -153,31 +167,32 @@ class SVGDrawer(object):
 		defs = ET.Element('defs')
 		gradientList = []
 		for hmmerResult in self.hmmerResults:
-			for hit in hmmerResult.hits:
-				if not hit.color:
-		 			if hit.name in hmmcolors:
-		 				hit.color = hmmcolors[hit.name]
-		 			else:
-		 				hmmcolors[hit.name]=colors[colorIndex]
-		 				hit.color = colors[colorIndex]
-		 				if colorIndex < len(colors)-1:
-		 					colorIndex+=1
-		 				else:
-		 					colorIndex = 0
-				if hit.gradient:
-					gradientid = "gradient_"+hit.color
-					if not gradientid in gradientList:
-						gradientList.append(gradientid)
-						gradient = ET.Element('linearGradient', id=gradientid, x1="0%",y1="-20%",x2="0%",y2="120%")
-						stop1 = ET.Element('stop', offset="0%", style="stop-color:white;stop-opacity:1")
-						stop2 = ET.Element('stop', offset="40%", style="stop-color:"+hit.color+";stop-opacity:1")
-						stop3 = ET.Element('stop', offset="60%", style="stop-color:"+hit.color+";stop-opacity:1")					
-						stop4 = ET.Element('stop', offset="100%", style="stop-color:white;stop-opacity:1")
-						gradient.append(stop1)
-						gradient.append(stop2)
-						gradient.append(stop3)
-						gradient.append(stop4)	
-						defs.append(gradient)
+			for (tier, hits) in hmmerResult.features.items():
+				for hit in hits:
+					if not hit.color:
+			 			if hit.name in hmmcolors:
+			 				hit.color = hmmcolors[hit.name]
+			 			else:
+			 				hmmcolors[hit.name]=colors[colorIndex]
+			 				hit.color = colors[colorIndex]
+			 				if colorIndex < len(colors)-1:
+			 					colorIndex+=1
+			 				else:
+			 					colorIndex = 0
+					if hit.gradient:
+						gradientid = "gradient_"+hit.color
+						if not gradientid in gradientList:
+							gradientList.append(gradientid)
+							gradient = ET.Element('linearGradient', id=gradientid, x1="0%",y1="-20%",x2="0%",y2="120%")
+							stop1 = ET.Element('stop', offset="0%", style="stop-color:white;stop-opacity:1")
+							stop2 = ET.Element('stop', offset="40%", style="stop-color:"+hit.color+";stop-opacity:1")
+							stop3 = ET.Element('stop', offset="60%", style="stop-color:"+hit.color+";stop-opacity:1")					
+							stop4 = ET.Element('stop', offset="100%", style="stop-color:white;stop-opacity:1")
+							gradient.append(stop1)
+							gradient.append(stop2)
+							gradient.append(stop3)
+							gradient.append(stop4)	
+							defs.append(gradient)
 		return(defs)	
 
 	def singleSVG(self,hmmer,doc,x,y,leftMargin,fontSize,conversion,boxHeight):
@@ -222,97 +237,124 @@ class SVGDrawer(object):
  		end.text = str(hmmer.length)
  		doc.append(end)
  		#
+ 		# Draw tier name
+ 		#
+ 		for (tier,name) in hmmer.tier.items():
+ 			tierLabel = ET.Element ('text', x=str(0), y=str(int(y+boxHeight*0.3+boxHeight*tier)),
+ 									fill='black', style='font-family:Sans-Serif;font-size:13px;text-anchor:right;dominant-baseline:middle')
+ 			tierLabel.text = name
+ 			doc.append(tierLabel)
+
+ 		#
  		# Draw Domains
  		#
- 		for hit in hmmer.hits:
- 			if not hit.exclude:
-		 		color = hit.color
-		 		if hit.border :
-		 			border = ';stroke-width:1;stroke:black'
-		 		else:
-		 			border = ''
-		 		if hit.gradient:
-		 			style='fill:url(#'+'gradient_'+hit.color+')'+border
-		 		else:
-		 			style = 'fill:'+color+border
-	 			#
-	 			# Draw rectanglar domains
-	 			#
+ 		for (tier,hits) in hmmer.features.items():
+ 			for hit in hits:
+	 			if not hit.exclude:
+			 		color = hit.color
+			 		if hit.border :
+			 			border = ';stroke-width:1;stroke:black'
+			 		else:
+			 			border = ''
+			 		if hit.gradient:
+			 			style='fill:url(#'+'gradient_'+hit.color+')'+border
+			 		else:
+			 			style = 'fill:'+color+border
+		 			#
+		 			# Draw rectanglar domains
+		 			#
+		 			labelfont = 13
+		 			
 
-	 			if (hit.desc and hit.desc=="feature"):
-	 				rectYPos = int(y+boxHeight*1.3)
-	 				rectHeight = int(boxHeight/3)
-	 				labelYPos = int(y+boxHeight*2.2)
-	 				
-	 			else:
-	 				rectYPos = y-boxHeight/2
-	 				rectHeight = boxHeight
-	 				labelfont = 13
-		 			if (len(str(hit.name))*labelfont*0.5>(hit.end - hit.start)*conversion):
-						labelYPos = int(y-0.8*boxHeight)
-					else:
-						labelYPos = y+int (boxHeight/3.5)
-					numberYPos = y+boxHeight
-	 			
-	 			rect = ET.Element('rect', x=str(leftMargin+int(hit.start*conversion)), y=str(rectYPos),
-	 								 width=str(int((hit.end - hit.start)*conversion)), 
-	 								 height=str(rectHeight), style=style)
-	 			
-	 			if hit.acc:
-	 				link = ET.Element('a')
-	 				link.attrib["xlink:href"]="http://pfam.sanger.ac.uk/family/{0}".format(hit.acc)
-	 				link.append(rect)
-	 				doc.append(link)
-	 			else:
-	 				doc.append(rect)
-	 			#
-	 			# Draw Domain Label
-	 			#
-	 			if hit.label:
-		 			textLabel = ET.Element('text',x=str(leftMargin+int((hit.start+(hit.end-hit.start)*0.5)*conversion)),y=str(labelYPos),fill='black',
-		 									style='font-family:Sans-Serif;font-size:'+str(labelfont)+'px;text-anchor:middle')
-	 				textLabel.text = hit.name
-	 				if hit.acc:
-	 					link = ET.Element('a')
-	 					link.attrib["xlink:href"]="http://pfam.sanger.ac.uk/family/{0}".format(hit.acc)
-	 					link.append(textLabel)
-	 					doc.append(link)
-	 				else:
-	 					doc.append(textLabel)
-	 			#
-	 			# Draw start and end aa numbers of the domain
-	 			#
-	 			# Adjust location of number based on the domain length
-	 			#
-	 			numberFont=9
-	 			if (leftMargin+hit.start*conversion+numberFont*0.6*(len(str(hit.start))))>(leftMargin+hit.end*conversion-len(str(hit.end))*numberFont*0.6):
-	 				deltaStart = int(numberFont*-0.5*len(str(hit.start)))
-	 				deltaEnd = int(numberFont*0.5*len(str(hit.end)))
-	 			else:
-	 				deltaStart = 0
-	 				deltaEnd = 0
-	 			startEndLink = ET.Element('a')
-	 			startEndLink.attrib["xlink:href"]="http://www.uniprot.org/blast/?about={0}[{1}-{2}]".format(hmmer.accession, hit.start, hit.end)
-	 			
-		 		if hit.startshow:	
-		 			hitStart = ET.Element('text', x=str(leftMargin+int(hit.start*conversion)+deltaStart), y=str(numberYPos), fill='black', 
-									style='font-family:Sans-Serif;font-size:'+str(numberFont)+'px;text-anchor:left;dominant-baseline:top')
-			 		hitStart.text = str(hit.start)
-			 		if hmmer.source == 'uniprot':
-						startEndLink.append(hitStart)
-						doc.append(startEndLink)
-					else:
-			 			doc.append(hitStart)
+		 			if (hit.desc and hit.desc=="feature"):
+		 				rectYPos = int(y+boxHeight*0.3+boxHeight*hit.tier)
+		 				rectHeight = int(boxHeight/3)
+		 				labelYPos = int(y+boxHeight*1.2+boxHeight*hit.tier)
+		 				
+		 			else:
+		 				rectYPos = y-boxHeight/2
+		 				rectHeight = boxHeight
+		 				if (len(str(hit.name))*labelfont*0.5>(hit.end - hit.start)*conversion):
+							labelYPos = int(y-0.8*boxHeight)
+							labelfont = 11
+						else:
+							labelYPos = y+int(boxHeight/3.5)
+						numberYPos = y+boxHeight
+		 			
+		 			rect = ET.Element('rect', x=str(leftMargin+int(hit.start*conversion)), y=str(rectYPos),
+		 								 width=str(int((hit.end - hit.start)*conversion)), 
+		 								 height=str(rectHeight), style=style)
+		 			
+		 			if hit.acc:
+		 				link = ET.Element('a')
+		 				link.attrib["xlink:href"]="http://pfam.sanger.ac.uk/family/{0}".format(hit.acc)
+		 				link.append(rect)
+		 				doc.append(link)
+		 			else:
+		 				doc.append(rect)
+		 			#
+		 			# Draw Domain Label
+		 			#
+		 			labelXPos = leftMargin+int((hit.start+(hit.end-hit.start)*0.5)*conversion)
+		 			if hit.label: #and labelXPos > labelXEnd:
+		 				
+			 			textLabel = ET.Element('text',x=str(labelXPos),y=str(labelYPos),fill='black',
+			 									style='font-family:Sans-Serif;font-size:'+str(labelfont)+'px;text-anchor:middle')
 
-				if hit.endshow:		
-			 		hitEnd = ET.Element('text', x=str(leftMargin+int(hit.end*conversion)-len(str(hit.end))*numberFont*0.5+deltaEnd), y=str(numberYPos), fill='black', 
-										style='font-family:Sans-Serif;font-size:'+str(numberFont)+'px;text-anchor:right;dominant-baseline:top')
-			 		hitEnd.text = str(hit.end)
-			 		if hmmer.source == 'uniprot':
-						startEndLink.append(hitEnd)
-						doc.append(startEndLink)
-					else:
-			 			doc.append(hitEnd)
+			 			if (hit.desc and hit.desc=="feature" and (len(hit.name)*labelfont*0.5>(hit.end - hit.start)*conversion)):
+							splited = splitsentence(hit.name)
+							for i in range(len(splited)):
+								if i==0:
+									tspan = ET.Element('tspan', x=str(labelXPos))
+								else:
+									tspan = ET.Element('tspan', x=str(labelXPos),dy=str(labelfont))
+								tspan.text = splited[i]
+								textLabel.append(tspan)
+		 				else:
+		 					textLabel.text = hit.name
+
+		 
+		 				if hit.acc:
+		 					link = ET.Element('a')
+		 					link.attrib["xlink:href"]="http://pfam.sanger.ac.uk/family/{0}".format(hit.acc)
+		 					link.append(textLabel)
+		 					doc.append(link)
+		 				else:
+		 					doc.append(textLabel)
+		 			#
+		 			# Draw start and end aa numbers of the domain
+		 			#
+		 			# Adjust location of number based on the domain length
+		 			#
+		 			numberFont=9
+		 			if (leftMargin+hit.start*conversion+numberFont*0.6*(len(str(hit.start))))>(leftMargin+hit.end*conversion-len(str(hit.end))*numberFont*0.6):
+		 				deltaStart = int(numberFont*-0.5*len(str(hit.start)))
+		 				deltaEnd = int(numberFont*0.5*len(str(hit.end)))
+		 			else:
+		 				deltaStart = 0
+		 				deltaEnd = 0
+		 			startEndLink = ET.Element('a')
+		 			startEndLink.attrib["xlink:href"]="http://www.uniprot.org/blast/?about={0}[{1}-{2}]".format(hmmer.accession, hit.start, hit.end)
+		 			
+			 		if hit.startshow:	
+			 			hitStart = ET.Element('text', x=str(leftMargin+int(hit.start*conversion)+deltaStart), y=str(numberYPos), fill='black', 
+										style='font-family:Sans-Serif;font-size:'+str(numberFont)+'px;text-anchor:left;dominant-baseline:top')
+				 		hitStart.text = str(hit.start)
+				 		if hmmer.source == 'uniprot':
+							startEndLink.append(hitStart)
+							doc.append(startEndLink)
+						else:
+				 			doc.append(hitStart)
+
+					if hit.endshow:		
+				 		hitEnd = ET.Element('text', x=str(leftMargin+int(hit.end*conversion)-len(str(hit.end))*numberFont*0.5+deltaEnd), y=str(numberYPos), fill='black', 
+											style='font-family:Sans-Serif;font-size:'+str(numberFont)+'px;text-anchor:right;dominant-baseline:top')
+				 		hitEnd.text = str(hit.end)
+				 		if hmmer.source == 'uniprot':
+							startEndLink.append(hitEnd)
+							doc.append(startEndLink)
+						else:
+				 			doc.append(hitEnd)
 		return(doc)
 
 

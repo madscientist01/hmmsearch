@@ -14,32 +14,14 @@ import argparse
 import glob
 import sys
 import subprocess
+from hmmerhit import HmmerHit
 from htmltable import HTMLTable
 from inputfile import InputFile
 from fetchutil import readFasta, readAccession
 from svgdrawer import SVGDrawer
+from annotation import miscAnnotation
+from uniprotannotation import UniprotAnnotation
 
-class HmmerHit(object):
-	#
-	# Class for the Hmmer domain hits
-	#
-	def __init__(self, **kwargs):
-		self.name=kwargs.get('name')
-		self.acc=kwargs.get('acc')
-		self.desc = kwargs.get('desc')
-		self.evalue=kwargs.get('evalue')
-		self.ievalue=kwargs.get('ievalue')
-		self.cevalue=kwargs.get('cevalue')
-		self.start = int(kwargs.get('start'))
-		self.end=int(kwargs.get('end'))
-		self.bitscore = kwargs.get('bitscore')
-		self.exclude = False
-		self.color = None
-		self.label = True
-		self.border = True
-		self.startshow = True
-		self.endshow = True
-		self.gradient = False
 
 # install a custom handler to prevent following of redirects automatically.
 class SmartRedirectHandler(urllib2.HTTPRedirectHandler):
@@ -75,33 +57,35 @@ class Hmmer(object):
 		(self.name, self.sequence) = readFasta(self.file)
 		(self.source,self.accession)= readAccession(self.file)
 		self.length=len(self.sequence)
-		self.hits = []
+		self.features = {}
+		hits=[]
+		self.features['domain']=hits
+		self.tier = {}
+		self.tier[0]='Pfam'
+		
 	
 	def exclude(self):
 		#
 		# Exclude overlapped domain. If two domains are overlapped, the one have higher bitscore will be retained
 		#
 
-		if len(self.hits)>1:
+		if len(self.features['domain'])>1:
 
-			# for hit in self.hits:
-			# 	print hit.name, hit.start, hit.end, hit.bitscore, hit.exclude, "\n"
-
-			for i in range (len(self.hits)-1):			
-				for j in range (i+1,len(self.hits)):
-					# if (self.hits[i].acc == self.hits[j].acc and not self.hits[i].exclude and not self.hits[j].exclude):
-					if (not self.hits[i].exclude and not self.hits[j].exclude):	
-						if (self.hits[i].end > self.hits[j].start) and (self.hits[i].end<self.hits[j].end):
-							if (self.hits[i].bitscore > self.hits[j].bitscore):
-								self.hits[j].exclude = True			
+			
+			for i in range (len(self.features['domain'])-1):			
+				for j in range (i+1,len(self.features['domain'])):
+					if (not self.features['domain'][i].exclude and not self.features['domain'][j].exclude):	
+						if (self.features['domain'][i].end > self.features['domain'][j].start) and (self.features['domain'][i].end<self.features['domain'][j].end):
+							if (self.features['domain'][i].bitscore > self.features['domain'][j].bitscore):
+								self.features['domain'][j].exclude = True			
 							else:
-								self.hits[i].exclude = True
+								self.features['domain'][i].exclude = True
 
-						if (self.hits[j].end > self.hits[i].start) and (self.hits[j].end<self.hits[i].end):
-							if (self.hits[i].bitscore > self.hits[j].bitscore):
-								self.hits[j].exclude = True			
+						if (self.features['domain'][j].end > self.features['domain'][i].start) and (self.features['domain'][j].end<self.features['domain'][i].end):
+							if (self.features['domain'][i].bitscore > self.features['domain'][j].bitscore):
+								self.features['domain'][j].exclude = True			
 							else:
-								self.hits[i].exclude = True
+								self.features['domain'][i].exclude = True
 			
 	def runRemote(self):
 		#
@@ -162,7 +146,7 @@ class Hmmer(object):
 						bitscore = element.get('bitscore')
 						hit = HmmerHit(	name=name, desc=desc, acc=acc,bitscore=bitscore,
 										evalue=evalue, ievalue=ievalue, cevalue=cevalue, start=start, end=end)
-						self.hits.append(hit)
+						self.features['domain'].append(hit)
 
 			self.exclude()
 			return(True)
@@ -212,7 +196,7 @@ class Hmmer(object):
 						name = splited[0]
 						hit = HmmerHit(	name=name, desc=desc, acc=acc,bitscore=bitscore,
 										evalue=evalue, ievalue=ievalue, cevalue=cevalue, start=start, end=end)
-						self.hits.append(hit)
+						self.features['domain'].append(hit)
 
 			self.exclude()			
 			return(True)
@@ -236,6 +220,7 @@ class HmmerScanRunner(object):
 		self.outputHTML = kwargs.get('outputHTML')
 		self.outputSVG = kwargs.get('outputSVG')
 		self.threshold = kwargs.get('threshold')
+		self.scaleFactor = kwargs.get('scaleFactor',1.5)
 		self.hmmerResults = []
 		self.titlemode = kwargs.get('titlemode',False)
 	
@@ -274,20 +259,20 @@ class HmmerScanRunner(object):
 				for hmmerResult in self.hmmerResults:
 					if (domain.proteinName == hmmerResult.name):
 						if domain.action == 'remove':
-							for hit in hmmerResult.hits:
-							#	print hit.name, domain.domainName, hit.start, domain.start, hit.end, domain.end
-								if (hit.name == domain.domainName) and (hit.start == domain.start) and (hit.end == domain.end):
-							#		print "excluded"
-									hit.exclude = True	
+							for (tier, hits) in hmmerResult.features.items():
+								for hit in hits:
+									if (hit.name == domain.domainName) and (hit.start == domain.start) and (hit.end == domain.end):
+										hit.exclude = True	
 						if domain.action == 'new':
 							pseudoHit = HmmerHit(name=domain.domainName, start=domain.start, end=domain.end)
-							hmmerResult.hits.append(pseudoHit)
+							hmmerResult.features['domain'].append(pseudoHit)
 			
 			for renameDef in self.inputFile.renameDefinitions:
 				for hmmerResult in self.hmmerResults:
-					for hit in hmmerResult.hits:
-						if (hit.name == renameDef.domainName):
-							hit.name = renameDef.newName
+					for (tier, hits) in hmmerResult.features.items():
+						for hit in hits:
+							if (hit.name == renameDef.domainName):
+								hit.name = renameDef.newName
 
 
 			for colorDef in self.inputFile.colorDefinitions:
@@ -314,17 +299,38 @@ class HmmerScanRunner(object):
 						endshow = False
 
 				for hmmerResult in self.hmmerResults:
-					for hit in hmmerResult.hits:
-						if (hit.name == colorDef.domainName and colorDef.color in colors):
-							hit.color = colorDef.color
-							hit.gradient = gradient
-							hit.border = border
-							hit.label = label
-							hit.number = number
-							hit.startshow = startshow
-							hit.endshow = endshow
+					for (tier, hits) in hmmerResult.features.items():
+						for hit in hmmerResult.hits:
+							if (hit.name == colorDef.domainName and colorDef.color in colors):
+								hit.color = colorDef.color
+								hit.gradient = gradient
+								hit.border = border
+								hit.label = label
+								hit.number = number
+								hit.startshow = startshow
+								hit.endshow = endshow
 		return 
+	
 
+	def loadAnnotation(self):
+
+		for hmmerResult in self.hmmerResults:
+			disorder = miscAnnotation(method='disorder',tier=1,color='grey')
+			disorder.readFile(hmmerResult.file)
+			hmmerResult.features['disorder'] = disorder.hits
+			hmmerResult.tier[1]='Disorder'
+			coils = miscAnnotation(method='coils',tier=2,color='green')
+			coils.readFile(hmmerResult.file)
+			hmmerResult.features['coils'] = coils.hits
+			hmmerResult.tier[2]='Coiled-coil'
+			uniprot = UniprotAnnotation(tier=3)
+			uniprot.readFile(hmmerResult.file)
+			hmmerResult.features['uniprot'] = uniprot.hits
+			hmmerResult.tier[3]='UniProt'
+			
+
+
+		return
 	def run(self):
 
 		if self.inputFileName:
@@ -358,8 +364,9 @@ class HmmerScanRunner(object):
 					self.hmmerResults.append(hmmer)
 		if len(self.hmmerResults)>0:
 			self.processHmmerResults()
+			self.loadAnnotation()
 			self.hmmerResults.sort(key=lambda x:x.name)
-			draw = SVGDrawer(outputSVG=self.outputSVG, hmmerResults = self.hmmerResults, outputHTML=self.outputHTML, titlemode = self.titlemode)
+			draw = SVGDrawer(outputSVG=self.outputSVG, scaleFactor = self.scaleFactor, hmmerResults = self.hmmerResults, outputHTML=self.outputHTML, titlemode = self.titlemode)
 			draw.drawSVG()
 			(svgFileNames,svgContent) = draw.drawMultiSVG()
 			header = ['Accession','Name','Domain','length']
@@ -376,7 +383,7 @@ class HmmerScanRunner(object):
 				nameLink = "<a href='#{1}'>{0}</a>".format(hmmerResult.name,hmmerResult.accession)
 				domain = []
 
-				for hit in hmmerResult.hits:
+				for hit in hmmerResult.features['domain']:
 					if hit.acc:
 						domainName="<a href='http://pfam.sanger.ac.uk/family/{0}'>{1}</a>".format(hit.acc, hit.name)
 					else:
