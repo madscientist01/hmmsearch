@@ -38,7 +38,6 @@ def readAccession(filename) :
 		line = f.readline().strip()
 		if not line: 
 			return(None) 
-		print line
 		refSeqMatch = refseqRegex.match(line)
 		if refSeqMatch:
 			db = "refseq"
@@ -46,11 +45,9 @@ def readAccession(filename) :
 		else:
 			uniprotMatch = uniprotRegex.match(line)
 			if uniprotMatch:
-				print "match"
 				db = "uniprot"
 				accession = uniprotMatch.group(2)	
 		f.close()
-		print db, accession
 	return(db, accession)	    	
 	
 def fetchfromUniprot(uniprotId):

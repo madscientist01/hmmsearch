@@ -22,6 +22,7 @@ from fetchutil import readFasta, readAccession
 from svgdrawer import SVGDrawer
 from annotation import miscAnnotation
 from uniprotannotation import UniprotAnnotation
+from phmmer import PhmmerSearch
 
 
 # install a custom handler to prevent following of redirects automatically.
@@ -342,6 +343,10 @@ class HmmerScanRunner(object):
 			uniprot.readFile(hmmerResult.file)
 			hmmerResult.features['uniprot'] = uniprot.hits
 			hmmerResult.tier[3]='UniProt'
+			phmmer = PhmmerSearch(tier=4,)
+			phmmer.readFile(hmmerResult.file)
+			hmmerResult.features['PDB']=phmmer.hits
+			hmmerResult.tier[4]='PDB'
 			
 
 
