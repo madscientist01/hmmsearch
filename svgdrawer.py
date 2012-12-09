@@ -37,9 +37,9 @@ class SVGDrawer(object):
 		return(maxLength,maxTitleLength)
 
 	def saveSVG(self,filename,doc):
-		#
-		# Save SVG based on the ElementTreeDoc
-		#
+		"""
+		Save doc (ElementTreeDoc) content as a svg file.
+		"""
 		f = open(filename, 'w')
 		f.write('<?xml version=\"1.0\" standalone=\"no\"?>\n')
 		f.write('<!DOCTYPE svg PUBLIC \"-//W3C//DTD SVG 1.1//EN\"\n')
@@ -48,9 +48,12 @@ class SVGDrawer(object):
 		f.close()
 		return()
 
-	def drawSVG(self):
-		
-		# Draw SVG based on the hmmer domaim
+	def drawSVG(self):		
+		""" 
+		Draw SVG based on the hmmer domain. all of proteins in hmmerResults object will be
+		drawed in single SVG file.
+
+		"""
 		x = 50
 		y = 70
 		leftMargin = 200
@@ -95,7 +98,7 @@ class SVGDrawer(object):
 	
 	def drawMultiSVG(self):
 		
-		# Draw SVG based on the hmmer domaim
+		"""Draw SVG based on the hmmer domains as a svg file per protein. """
 		x = 50
 		y = 60
 		leftMargin = 200
@@ -110,7 +113,6 @@ class SVGDrawer(object):
 		svgFileNames = {}
 		svgContent = {}
 		# If protein name width is bigger than leftMargin, wrote Label at top of proteins (self.titlemode=True)
-	
 		if maxTitleLength*fontSize*conversion*0.7 > leftMargin:
 			self.titlemode = True
 		else:
@@ -142,7 +144,11 @@ class SVGDrawer(object):
 
 
 	def colorDef(self):
-		
+		""" 
+		Color and gradient definition on each hits based on the name
+		If name of hit is not assigned color, it will assigned with different color by its name.
+		If gradient flag in hmmerhit object is set, gradient definition for svg will be generated
+		"""
 		colors = ['aliceblue','antiquewhite', 'aqua', 'aquamarine', 'azure', 'beige', 'bisque', 'black', 'blanchedalmond', 
 				'blue', 'blueviolet', 'brown', 'burlywood', 'cadetblue', 'chartreuse', 'chocolate', 'coral', 
 				'cornflowerblue', 'cornsilk', 'crimson', 'cyan', 'darkblue', 'darkcyan', 'darkgoldenrod', 'darkgray', 
@@ -196,7 +202,9 @@ class SVGDrawer(object):
 		return(defs)	
 
 	def singleSVG(self,hmmer,doc,x,y,leftMargin,fontSize,conversion,boxHeight):
-			# Draw Protein Text
+		""" 
+		svg drawing portion used for drawSVG and drawMultiSVG
+		"""
 		if len(hmmer.source)>0 and len(hmmer.accession)>0:
 
 			if hmmer.source == 'refseq':
@@ -244,7 +252,6 @@ class SVGDrawer(object):
  									fill='black', style='font-family:Sans-Serif;font-size:13px;text-anchor:right;dominant-baseline:middle')
  			tierLabel.text = name
  			doc.append(tierLabel)
-
  		#
  		# Draw Domains
  		#
@@ -284,10 +291,10 @@ class SVGDrawer(object):
 		 			rect = ET.Element('rect', x=str(leftMargin+int(hit.start*conversion)), y=str(rectYPos),
 		 								 width=str(int((hit.end - hit.start)*conversion)), 
 		 								 height=str(rectHeight), style=style)
-		 			
-		 			if hit.acc:
+		 			# Add Hyperlink for domain Label
+		 			if hit.labellink:
 		 				link = ET.Element('a')
-		 				link.attrib["xlink:href"]="http://pfam.sanger.ac.uk/family/{0}".format(hit.acc)
+		 				link.attrib["xlink:href"]=hit.labellink
 		 				link.append(rect)
 		 				doc.append(link)
 		 			else:
@@ -314,9 +321,9 @@ class SVGDrawer(object):
 		 					textLabel.text = hit.name
 
 		 
-		 				if hit.acc:
+		 				if hit.labellink:
 		 					link = ET.Element('a')
-		 					link.attrib["xlink:href"]="http://pfam.sanger.ac.uk/family/{0}".format(hit.acc)
+		 					link.attrib["xlink:href"]=hit.labellink
 		 					link.append(textLabel)
 		 					doc.append(link)
 		 				else:
@@ -333,14 +340,16 @@ class SVGDrawer(object):
 		 			else:
 		 				deltaStart = 0
 		 				deltaEnd = 0
-		 			startEndLink = ET.Element('a')
-		 			startEndLink.attrib["xlink:href"]="http://www.uniprot.org/blast/?about={0}[{1}-{2}]".format(hmmer.accession, hit.start, hit.end)
-		 			
+		 			# Add hyperlink for protein portions
+		 			if hit.positionlink:
+		 				startEndLink = ET.Element('a')
+		 				startEndLink.attrib["xlink:href"]=hit.positionlink
+
 			 		if hit.startshow:	
 			 			hitStart = ET.Element('text', x=str(leftMargin+int(hit.start*conversion)+deltaStart), y=str(numberYPos), fill='black', 
 										style='font-family:Sans-Serif;font-size:'+str(numberFont)+'px;text-anchor:left;dominant-baseline:top')
 				 		hitStart.text = str(hit.start)
-				 		if hmmer.source == 'uniprot':
+				 		if hit.positionlink:
 							startEndLink.append(hitStart)
 							doc.append(startEndLink)
 						else:
@@ -350,7 +359,7 @@ class SVGDrawer(object):
 				 		hitEnd = ET.Element('text', x=str(leftMargin+int(hit.end*conversion)-len(str(hit.end))*numberFont*0.5+deltaEnd), y=str(numberYPos), fill='black', 
 											style='font-family:Sans-Serif;font-size:'+str(numberFont)+'px;text-anchor:right;dominant-baseline:top')
 				 		hitEnd.text = str(hit.end)
-				 		if hmmer.source == 'uniprot':
+				 		if hit.positionlink:
 							startEndLink.append(hitEnd)
 							doc.append(startEndLink)
 						else:

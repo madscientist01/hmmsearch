@@ -1,15 +1,12 @@
 #!/usr/bin/python
 import urllib
 import urllib2
-
 from hmmerhit import HmmerHit
 from fetchutil import readFasta, readAccession
 import xml.etree.ElementTree as ET
 import sys
 import re
 import glob
-
-
 
 class SmartRedirectHandler(urllib2.HTTPRedirectHandler):
     def http_error_301(self, req, fp, code, msg, headers):
@@ -19,9 +16,11 @@ class SmartRedirectHandler(urllib2.HTTPRedirectHandler):
         return headers
 
 class PhmmerSearch(object):
+	"""
+	Search pdb sequence databases to extract matched PDB structure for a sequence using phmmer (http://hmmer.janelia.org/search/phmmer)
 
+	"""
 	def __init__(self, **kwargs):
-
 		self.file=kwargs.get('file')
 		self.name=kwargs.get('name')
 		self.sequence = kwargs.get('sequence')
@@ -45,24 +44,28 @@ class PhmmerSearch(object):
 		return
 
 	def removeRedundant(self):
+		"""
+		Removal of overlapped PDB hits from hit list (self.hits)
+		"""
 		for i in range(len(self.hits)):
 			for j in range(i+1,len(self.hits)):
 				one = self.hits[i]
 				another = self.hits[j]
-
+				# if 'one' has cover entire range of 'another' and its bitscore is higher than 'another', exclude 'another'
+				# note that bitscore is stored as STRING so it should be typecasted as float before comparisions
 				if ((one.start <= another.start) and (one.end>=another.end) and (float(one.bitscore)>=float(another.bitscore))):
 					another.exclude = True
-
+				# if 'another' has cover entire range of 'one' and its bitscore is higher than 'another', exclude 'one'
 				if ((one.start >= another.start) and (one.end<=another.end) and (float(one.bitscore)<=float(another.bitscore))):
 					one.exclude = True
-									
+				# if 'one' and 'another' is overlapped significant portions, (if overlapped length is 90% of length of domain)
+				# exclude 'another'.					
 				if ((one.start<=another.start) and (one.end>=another.start)) or ((one.start>=another.start) and (one.start<=another.end)):
 					overlaplength = min(one.end,another.end) - max(one.start,another.start)
 					# print one.start, one.end, another.start, another.end, overlaplength, one.end-one.start, one.end-one.start*0.8
 					if (one.end-one.start)*0.9 < overlaplength:
 						another.exclude=True
 					overlaplength = 0
-
 			
 		return
 
@@ -73,7 +76,7 @@ class PhmmerSearch(object):
 		if not self.db in ['swissprot', 'pdb']:
 			print "invalid db. It should be either pdb or swissprot"
 			sys.exit()
-
+		# Strip chain name from PDB id
 		stripchain = re.compile('(\S{4})_\S$')
 		parameters = {
 		              'seqdb':self.db,
@@ -121,8 +124,9 @@ class PhmmerSearch(object):
 						start = element.get('alihmmfrom')
 					 	end = element.get('alihmmto')
 						bitscore = element.get('bitscore')
-						hit = HmmerHit(	name=name, acc=acc,bitscore=bitscore,
-										evalue=evalue, ievalue=ievalue, cevalue=cevalue, start=start, end=end)
+						labelink = "http://www.rcsb.org/pdb/explore/explore.do?structureId={0}".format(name)
+						hit = HmmerHit(	name=name, acc=acc,bitscore=bitscore,labellink=labelink,
+										evalue=evalue, ievalue=ievalue, cevalue=cevalue, start=start, end=end)						
 						hit.desc = "feature"
 						hit.border = True
 					 	hit.startshow = False

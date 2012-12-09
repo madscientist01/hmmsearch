@@ -24,7 +24,6 @@ from annotation import miscAnnotation
 from uniprotannotation import UniprotAnnotation
 from phmmer import PhmmerSearch
 
-
 # install a custom handler to prevent following of redirects automatically.
 class SmartRedirectHandler(urllib2.HTTPRedirectHandler):
     def http_error_302(self, req, fp, code, msg, headers):
@@ -74,16 +73,12 @@ class Hmmer(object):
 		self.features['domain']=hits
 		self.tier = {}
 		self.tier[0]='Pfam'
-		
 	
 	def exclude(self):
 		#
 		# Exclude overlapped domain. If two domains are overlapped, the one have higher bitscore will be retained
 		#
-
 		if len(self.features['domain'])>1:
-
-			
 			for i in range (len(self.features['domain'])-1):			
 				for j in range (i+1,len(self.features['domain'])):
 					if (not self.features['domain'][i].exclude and not self.features['domain'][j].exclude):	
@@ -158,7 +153,11 @@ class Hmmer(object):
 							start = element.get('iali')
 							end = element.get('jali')
 							bitscore = element.get('bitscore')
-							hit = HmmerHit(	name=name, desc=desc, acc=acc,bitscore=bitscore,
+							labelink = "http://pfam.sanger.ac.uk/family/{0}".format(acc)
+							if self.source=='uniprot':
+								numberlink = "http://www.uniprot.org/blast/?about={0}[{1}-{2}]".format(self.accession, start, end)
+						
+							hit = HmmerHit(	name=name, desc=desc, acc=acc,bitscore=bitscore,labelink=labelink, numberlink=numberlink,
 											evalue=evalue, ievalue=ievalue, cevalue=cevalue, start=start, end=end)
 							self.features['domain'].append(hit)
 
@@ -210,7 +209,9 @@ class Hmmer(object):
 						desc = line[181:202]
 						evalue = splited[6]
 						name = splited[0]
-						hit = HmmerHit(	name=name, desc=desc, acc=acc,bitscore=bitscore,
+						labelink = "http://pfam.sanger.ac.uk/family/{0}".format(acc)
+						positionlink = "http://www.uniprot.org/blast/?about={0}[{1}-{2}]".format(self.accession, start, end)
+						hit = HmmerHit(	name=name, desc=desc, acc=acc,bitscore=bitscore,labelink=labelink, numberlink=positionlink,
 										evalue=evalue, ievalue=ievalue, cevalue=cevalue, start=start, end=end)
 						self.features['domain'].append(hit)
 
@@ -325,6 +326,8 @@ class HmmerScanRunner(object):
 								hit.number = number
 								hit.startshow = startshow
 								hit.endshow = endshow
+
+
 		return 
 	
 

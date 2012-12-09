@@ -5,8 +5,6 @@
 # Written by Madscientist (http://madscientist.wordpress.com, https://github.com/madscientist01/)
 #
 
-# mysql query 
-# mysql -N --user=genome --host=genome-mysql.cse.ucsc.edu -A -D hg19 -e 'select spDisplayID,geneSymbol,refseq from kgXref inner join kgProtAlias on kgXref.kgID=kgProtAlias.kgID where alias="NP_005883" or alias="NP_005210 g"' 
 from __future__ import division
 import urllib
 import urllib2
@@ -14,7 +12,6 @@ import os
 import xml.etree.ElementTree as ET
 import argparse
 import re
-# import glob
 import sys
 import subprocess
 from hmmer import HmmerScanRunner

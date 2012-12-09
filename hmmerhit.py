@@ -1,7 +1,12 @@
 class HmmerHit(object):
-	#
-	# Class for the Hmmer domain hits
-	#
+	"""
+	Hmmer domain hits data container
+
+	name : Name of hit. It is used for the label display in svgdrawer.py
+	acc : Accession #
+	desc : Description
+	evalue : evalue of hit
+	"""
 	def __init__(self, **kwargs):
 		self.name=kwargs.get('name')
 		self.acc=kwargs.get('acc')
@@ -12,6 +17,8 @@ class HmmerHit(object):
 		self.start = int(kwargs.get('start'))
 		self.end=int(kwargs.get('end'))
 		self.bitscore = kwargs.get('bitscore')
+		self.labellink = kwargs.get('labelink')
+		self.positionlink = kwargs.get('positionlink')
 		self.tier = 0
 		self.exclude = False
 		self.color = None
