@@ -92,7 +92,7 @@ class miscAnnotation(object):
 					 		hit.startshow = False
 					 		hit.endshow = False
 					 		hit.label = False
-					 		hit.gradient = True
+					 		hit.gradient = False
 					 		hit.color = self.color
 					 		hit.tier = self.tier	
 							self.hits.append(hit)

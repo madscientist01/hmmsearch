@@ -165,7 +165,7 @@ class PsipredAnnotation(object):
                     hit.border = False
                     hit.startshow = False
                     hit.endshow = False
-                    hit.gradient = True
+                    hit.gradient = False
                     if currentstate=="H":
                             color = 'green'
                     else:
