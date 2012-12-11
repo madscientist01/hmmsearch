@@ -26,7 +26,6 @@ class PsipredAnnotation(object):
 		self.prediction = []
 		self.confidence = []
 
-
 	def saveSVG(self,filename,doc):
 		"""
 		Save doc (ElementTreeDoc) content as a svg file.
@@ -56,8 +55,8 @@ class PsipredAnnotation(object):
 			svgfilename = match.group(1)+".svg"
 		else:
 			svgfilename = "output.svg"
-			
-		canvasHeight = int ((float(self.length)/float(columnWidth)+2)*yDelta)
+		print self.file
+		canvasHeight = int ((self.length/float(columnWidth)+2)*yDelta)
 		# doc is elementTree container for svg
 		doc = ET.Element('svg', width=str(canvasWidth), height=str(canvasHeight), version='1.2', xmlns='http://www.w3.org/2000/svg')
 		doc.attrib["xmlns:xlink"]="http://www.w3.org/1999/xlink"
@@ -107,7 +106,6 @@ class PsipredAnnotation(object):
 		prediction.text = ''.join(predict)
 		doc.append(aminoacids)
 		doc.append(prediction)
-
 		self.saveSVG(svgfilename,doc)
 
 		return
@@ -145,38 +143,47 @@ class PsipredAnnotation(object):
 			start = self.number[0]
 			end = self.number[0]
 			for i in range(1,len(self.number)):
-				if currentstate != self.prediction[i]:
-					hit = HmmerHit(start=start, end=end, desc="feature", name=state[currentstate])
-					hit.tier=self.tier
-					hit.label = False
-					self.border = False
-					self.startshow = False
-					self.endshow = False
-					self.gradient = False
-					self.hits.append(hit)
+				if (currentstate != self.prediction[i]):
+					self.addhit(start, state, end, currentstate)
+
 					start = self.number[i]
 				currentstate = self.prediction[i]
 				end = self.number[i]
-			hit = HmmerHit(start=start, end=end, desc="feature", name=state[currentstate])
-			self.hits.append(hit)
+				
+			self.addhit(start, state, end, currentstate)
 			self.sequence = ''.join(self.residues)
 			self.length = len(self.sequence)
 			return(True)
 		else:
 			return(False)
 
+        def addhit(self, start, state, end, currentstate):
+            if currentstate!="C":
+                    hit = HmmerHit(start=start, end=end, desc="feature", name=state[currentstate])
+                    hit.tier=self.tier
+                    hit.label = False
+                    hit.border = False
+                    hit.startshow = False
+                    hit.endshow = False
+                    hit.gradient = True
+                    if currentstate=="H":
+                            color = 'green'
+                    else:
+                            color = 'red'
+                    hit.color = color
+                    self.hits.append(hit)
+
 if __name__ == "__main__":
 
-	list = glob.glob("*.ss")
+	list = glob.glob("*.fasta")
 	uniprotResults=[]
 	for item in list:
 		psipred = PsipredAnnotation(file=item)
-		psipred.psipredReader()
-		print psipred.file
-		print psipred.sequence
-		for hit in psipred.hits:
-			print hit.start, hit.end, hit.name
-		print psipred.secondaryDraw()
+		success = psipred.psipredReader()
+		if success:
+			for hit in psipred.hits:
+				print hit.start, hit.end, hit.name
+			# psipred.secondaryDraw()
 
 
 
