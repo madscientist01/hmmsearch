@@ -44,7 +44,7 @@ class SVGDrawer(object):
 		f.write('<?xml version=\"1.0\" standalone=\"no\"?>\n')
 		f.write('<!DOCTYPE svg PUBLIC \"-//W3C//DTD SVG 1.1//EN\"\n')
 		f.write('\"http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd\">\n')
-		f.write('\n'.join(ET.tostringlist(doc)))
+		f.write(ET.tostring(doc))
 		f.close()
 		return()
 
@@ -279,7 +279,7 @@ class SVGDrawer(object):
 							labelfont = 11
 						else:
 							labelYPos = y+int(boxHeight/3.5+boxHeight*hit.tier)
-						numberYPos = y+boxHeight
+						numberYPos = y+boxHeight+boxHeight*hit.tier
 		 			
 		 			rect = ET.Element('rect', x=str(leftMargin+int(hit.start*conversion)), y=str(rectYPos),
 		 								 width=str(int((hit.end - hit.start)*conversion)), 
@@ -359,4 +359,121 @@ class SVGDrawer(object):
 				 			doc.append(hitEnd)
 		return(doc)
 
+	def sequencesDraw(self):
+
+		for hmmer in self.hmmerResults:
+			defs = self.colorDef()
+			self.singleSequenceDraw(hmmer, defs)
+		return
+
+
+	def singleSequenceDraw(self,singleSequence,defs):
+		"""
+		Draw Single Sequence Draw
+		"""		
+		yStart = 70
+		y = yStart
+		leftMargin = 200
+		fontSize = 14
+		columnWidth = 60
+		canvasWidth=1200
+		yDelta = 50
+		filenamebaseRegex = re.compile("(\S+).fasta")
+		match = filenamebaseRegex.match(singleSequence.file)
+		if match:
+			svgfilename = match.group(1)+"_sequence.svg"
+		else:
+			svgfilename = "output.svg"
+		canvasHeight = int ((singleSequence.length/float(columnWidth)+2)*yDelta)
+		# doc is elementTree container for svg
+		doc = ET.Element('svg', width=str(canvasWidth), height=str(canvasHeight), version='1.2', xmlns='http://www.w3.org/2000/svg')
+		doc.attrib["xmlns:xlink"]="http://www.w3.org/1999/xlink"
+		doc.append(defs)
+		cursor = 0
+		while (cursor<singleSequence.length):
+			numbers = ET.Element('text', x=str(leftMargin-fontSize), y=str(y), fill='black', 
+								style='font-family:Courier;font-size:'+str(fontSize)+'px;text-anchor:end;dominant-baseline:middle')
+			numbers.text = str(cursor+1)
+			doc.append(numbers)
+			text = singleSequence.sequence[cursor:cursor+columnWidth]
+			aminoacids = ET.Element('text', x=str(leftMargin), y=str(y), fill='black', 
+								style='font-family:Courier;font-size:'+str(fontSize)+'px;text-anchor:left;dominant-baseline:middle')
+			aminoacids.text = text
+			doc.append(aminoacids)
+			
+			if (cursor+columnWidth < singleSequence.length):
+				endnumbers = ET.Element('text', x=str(leftMargin+columnWidth*fontSize*0.63), y=str(y), fill='black', 
+									style='font-family:Courier;font-size:'+str(fontSize)+'px;text-anchor:end;dominant-baseline:middle')
+				endnumbers.text = str(cursor+columnWidth)
+				doc.append(endnumbers)
+			cursor+=columnWidth
+			y+=yDelta
+
+		text = singleSequence.sequence[cursor:singleSequence.length]
+		aminoacids = ET.Element('text', x=str(leftMargin), y=str(y), fill='black', 
+								style='font-family:Courier;font-size:'+str(fontSize)+'px;text-anchor:left;dominant-baseline:middle')
+		aminoacids.text = text
+		doc.append(aminoacids)
+
+		for (tier,hits) in singleSequence.features.items():
+			for hit in hits:
+				
+				if not hit.exclude:
+			 		if hit.border :
+			 			domainBorder = ';stroke-width:1;stroke:black'
+			 		else:
+			 			domainBorder = ''
+			 		if hit.gradient:
+			 			style='fill:url(#'+'gradient_'+ hit.color+')'+domainBorder
+			 		else:
+			 			style = 'fill:'+hit.color+domainBorder
+
+			 		style = style + ';fill-opacity:0.5'
+			 		if tier in ['domain', 'SS']:
+						doc = self.drawDomainSequence(doc, tier, hit.start, hit.end, style, hit.name, leftMargin,columnWidth,fontSize, yStart,yDelta )
+					
+		self.saveSVG(svgfilename,doc)
+		return
+
+
+	def drawDomainSequence(self, doc, tier, start, end, style, name, leftMargin, columnWidth, fontSize, yStart,yDelta):
+		"""
+		Draw Domain Rect
+		"""
+		ConversionFactor = 0.575
+		yPositions =[]
+		height = 20
+		startrow = start // columnWidth+1
+		i=0
+		while end > startrow*columnWidth: 
+			
+			xPos = int(leftMargin+(start%columnWidth)*fontSize*ConversionFactor)
+			width = int((columnWidth-start%columnWidth)*fontSize*ConversionFactor)
+			yPos = yStart+yDelta*(startrow-1)-height/2
+			middlePosX = xPos + width //2
+			middlePosY = yPos - height/2
+			domain = ET.Element('rect', x=str(xPos), y=str(yPos),width=str(width), height=str(height), style=style)
+			doc.append(domain)		
+			start = (startrow+1)*columnWidth
+			startrow+=1
+			i+=1
+
+		xPos = int(leftMargin+(start%columnWidth)*fontSize*ConversionFactor)
+		width = int((end%columnWidth-start%columnWidth)*fontSize*ConversionFactor)
+		yPos = yStart+yDelta*(startrow-1)-height/2
+		yPositions.append(yPos)
+		if i==0:
+			middlePosX = xPos+width //2
+			middlePosY = yPos-height/2
+
+		domain = ET.Element('rect', x=str(xPos), y=str(yPos),width=str(width), height=str(height), style=style)
+		doc.append(domain)
+		
+		text = ET.Element('text', x=str(middlePosX), y=str(middlePosY), fill='black', 
+								style='font-family:Arial;font-size:'+str(fontSize)+'px;text-anchor:left;dominant-baseline:middle')
+		text.text = name
+
+		doc.append(text)
+			 			
+		return(doc)
 

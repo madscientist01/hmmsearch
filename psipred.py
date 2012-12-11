@@ -183,7 +183,7 @@ if __name__ == "__main__":
 		if success:
 			for hit in psipred.hits:
 				print hit.start, hit.end, hit.name
-			# psipred.secondaryDraw()
+			psipred.secondaryDraw()
 
 
 

@@ -99,77 +99,93 @@ class Hmmer(object):
 		#
 		# Using Hmmscan in Hmmer3 web service, find locations of domains in the Fasta sequence and store into class
 		#
-		opener = urllib2.build_opener(SmartRedirectHandler())
-		urllib2.install_opener(opener)
-		print "Running Hmmscan of {0} using web service..".format(self.file)
-		if not self.db in ['pfam','superfamily','tigrfam', 'gene3d']:
-			print "{0} is not valid db. It should be pfam, superfamily, tigrfam or gene3d."
-			print "search will be carried out with pfam"
-			self.db = 'pfam'
+		if os.path.exists(self.file+".xml") :
+			print "{0} is already processed. Skipped.".format(self.file+".xml")
+			f = open(self.file+".xml")
+			read = f.readlines()
+			self.parseHmmerScanXML(''.join(read))
+			return(True)
+		else:
+			opener = urllib2.build_opener(SmartRedirectHandler())
+			urllib2.install_opener(opener)
+			print "Running Hmmscan of {0} using web service..".format(self.file)
+			if not self.db in ['pfam','superfamily','tigrfam', 'gene3d']:
+				print "{0} is not valid db. It should be pfam, superfamily, tigrfam or gene3d."
+				print "search will be carried out with pfam"
+				self.db = 'pfam'
 
-		parameters = {
-		              'hmmdb':self.db,
-		              'threshold':self.threshold,
-		              'seq':self.sequence
-		             }
-		enc_params = urllib.urlencode(parameters);
-		
-		try:
-			#post the seqrch request to the server
-			request = urllib2.Request('http://hmmer.janelia.org/search/hmmscan',enc_params)
-			#get the url where the results can be fetched from
-			results_url = urllib2.urlopen(request).getheader('location')
-			# modify the range, format and presence of alignments in your results here
-			res_params = {
-			              'output':'xml'
-			             }	            
-			# add the parameters to your request for the results
-			enc_res_params = urllib.urlencode(res_params)
-			modified_res_url = results_url + '?' + enc_res_params
-			# send a GET request to the server
-			results_request = urllib2.Request(modified_res_url)
-			data = urllib2.urlopen(results_request)
-			# print out the results
-			result = data.read()	
-			if result:
-				#
-				# Parse using ElementTree Modules (http://docs.python.org/2/library/xml.etree.elementtree.html)
-				#
-				f=open(self.file+".xml", "w")
-				f.write(result)
-				f.close()
-				root = ET.fromstring(result)
-				for child in root.iter('hits'):
-				
-					name = child.get('name')
-					desc = child.get('desc')
-					acc = child.get('acc')
-					evalue=child.get('evalue')				
-				
-					for element in child.iter('domains'):
-				
-						if (float(element.get('ievalue'))<float(self.cutoff)):
-							cevalue = element.get('cevalue')
-							ievalue = element.get('ievalue')
-							start = element.get('iali')
-							end = element.get('jali')
-							bitscore = element.get('bitscore')
-							labellink = "http://pfam.sanger.ac.uk/family/{0}".format(acc)
-							if self.source=='uniprot':
-								numberlink = "http://www.uniprot.org/blast/?about={0}[{1}-{2}]".format(self.accession, start, end)
-						
-							hit = HmmerHit(	name=name, desc=desc, acc=acc,bitscore=bitscore,labellink=labellink, numberlink=numberlink,
-											evalue=evalue, ievalue=ievalue, cevalue=cevalue, start=start, end=end)
-							self.features['domain'].append(hit)
-
-				self.exclude()
-				return(True)
-			else:
-				print "Failed to retrieve results" 
+			parameters = {
+			              'hmmdb':self.db,
+			              'threshold':self.threshold,
+			              'seq':self.sequence
+			             }
+			enc_params = urllib.urlencode(parameters);
+			
+			try:
+				#post the seqrch request to the server
+				request = urllib2.Request('http://hmmer.janelia.org/search/hmmscan',enc_params)
+				#get the url where the results can be fetched from
+				results_url = urllib2.urlopen(request).getheader('location')
+				# modify the range, format and presence of alignments in your results here
+				res_params = {
+				              'output':'xml'
+				             }	            
+				# add the parameters to your request for the results
+				enc_res_params = urllib.urlencode(res_params)
+				modified_res_url = results_url + '?' + enc_res_params
+				# send a GET request to the server
+				results_request = urllib2.Request(modified_res_url)
+				data = urllib2.urlopen(results_request)
+				# print out the results
+				result = data.read()	
+				if result:
+					#
+					# Parse using ElementTree Modules (http://docs.python.org/2/library/xml.etree.elementtree.html)
+					#
+					f=open(self.file+".xml", "w")
+					f.write(result)
+					f.close()
+					
+					self.parseHmmerScanXML(result)
+					return(True)
+				else:
+					print "Failed to retrieve results" 
+					return(False)
+			except HTTPError:
+				print "Hmmscan error"
 				return(False)
-		except HTTPError:
-			print "Hmmscan error"
-			return(False)
+
+        def parseHmmerScanXML(self, result):
+			"""
+			Parse Hmmerscan XML output into 
+
+			"""
+			root = ET.fromstring(result)
+			for child in root.iter('hits'):
+				name = child.get('name')
+				desc = child.get('desc')
+				acc = child.get('acc')
+				evalue=child.get('evalue')				
+
+				for element in child.iter('domains'):
+
+					if (float(element.get('ievalue'))<float(self.cutoff)):
+						cevalue = element.get('cevalue')
+						ievalue = element.get('ievalue')
+						start = element.get('iali')
+						end = element.get('jali')
+						bitscore = element.get('bitscore')
+						labellink = "http://pfam.sanger.ac.uk/family/{0}".format(acc)
+						if self.source=='uniprot':
+							numberlink = "http://www.uniprot.org/blast/?about={0}[{1}-{2}]".format(self.accession, start, end)
+
+						hit = HmmerHit(	name=name, desc=desc, acc=acc,bitscore=bitscore,labellink=labellink, numberlink=numberlink,
+										evalue=evalue, ievalue=ievalue, cevalue=cevalue, start=start, end=end)
+						self.features['domain'].append(hit)
+
+			self.exclude()
+			return()
+
 	def runLocal(self):
 		#
 		# Using Hmmscan in locally installed Hmmer3 packages, find locations of domains in the Fasta sequence and store 
@@ -362,6 +378,7 @@ class HmmerScanRunner(object):
 				hmmerResult.tier[5]='SS'
 
 		return
+
 	def run(self):
 
 		if self.inputFileName:
@@ -399,6 +416,7 @@ class HmmerScanRunner(object):
 			self.hmmerResults.sort(key=lambda x:x.name)
 			draw = SVGDrawer(outputSVG=self.outputSVG, scaleFactor = self.scaleFactor, hmmerResults = self.hmmerResults, outputHTML=self.outputHTML, titlemode = self.titlemode)
 			draw.drawSVG()
+			draw.sequencesDraw()
 			(svgFileNames,svgContent) = draw.drawMultiSVG()
 			header = ['Accession','Name','Domain','length']
 			table = HTMLTable(header = header)

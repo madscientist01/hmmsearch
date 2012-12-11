@@ -70,6 +70,9 @@ class PhmmerSearch(object):
 		return
 
 	def	phmmerSearch(self):
+		"""
+		search PDB hit using phmmer
+		"""
 		opener = urllib2.build_opener(SmartRedirectHandler())
 		urllib2.install_opener(opener)
 		print "search {0} in remote database".format(self.file)
@@ -88,7 +91,7 @@ class PhmmerSearch(object):
 		request = urllib2.Request('http://hmmer.janelia.org/search/phmmer',enc_params)
 		#get the url where the results can be fetched from
 		results_url = urllib2.urlopen(request).getheader('location')
-		# modify the range, format and presence of alignments in your results here
+		# Note that 'ali' parameter should be set as true otherwise service would not return alignment..
 		res_params = {
 		              'output':'xml',
 		              'ali':'true'		       
@@ -124,8 +127,8 @@ class PhmmerSearch(object):
 						start = element.get('alihmmfrom')
 					 	end = element.get('alihmmto')
 						bitscore = element.get('bitscore')
-						labelink = "http://www.rcsb.org/pdb/explore/explore.do?structureId={0}".format(name)
-						hit = HmmerHit(	name=name, acc=acc,bitscore=bitscore,labellink=labelink,
+						labellink = "http://www.rcsb.org/pdb/explore/explore.do?structureId={0}".format(name)
+						hit = HmmerHit(	name=name, acc=acc,bitscore=bitscore,labellink=labellink,
 										evalue=evalue, ievalue=ievalue, cevalue=cevalue, start=start, end=end)						
 						hit.desc = "feature"
 						hit.border = True

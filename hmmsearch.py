@@ -161,19 +161,23 @@ def fetchfromDB(dbId,dbformat):
 	#
 	uniprotURL = dbformat.format(dbId)
 	fileName = dbId+".fasta"
-	try:
-		req = urllib2.Request(uniprotURL)
-		u = urllib2.urlopen(req)
-		sequence = u.read()
-		fileName = dbId+".fasta"
-		f = open(fileName,'w')
-		f.write(sequence)
-		f.close()
+	if os.path.exists(fileName):
+		print "{0} is exist. Skip downloading.."
 		return(fileName)
+	else:
+		try:
+			req = urllib2.Request(uniprotURL)
+			u = urllib2.urlopen(req)
+			sequence = u.read()
+			fileName = dbId+".fasta"
+			f = open(fileName,'w')
+			f.write(sequence)
+			f.close()
+			return(fileName)
 
-	except urllib2.URLError:
-		print "{0} is not valid uniprot id".format(dbId)
-    	return(None)
+		except urllib2.URLError:
+			print "{0} is not valid uniprot id".format(dbId)
+	    	return(None)
 
 	return(fileName)
 
