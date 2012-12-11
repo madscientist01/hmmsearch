@@ -23,6 +23,7 @@ from svgdrawer import SVGDrawer
 from annotation import miscAnnotation
 from uniprotannotation import UniprotAnnotation
 from phmmer import PhmmerSearch
+from psipred import PsipredAnnotation
 
 # install a custom handler to prevent following of redirects automatically.
 class SmartRedirectHandler(urllib2.HTTPRedirectHandler):
@@ -153,11 +154,11 @@ class Hmmer(object):
 							start = element.get('iali')
 							end = element.get('jali')
 							bitscore = element.get('bitscore')
-							labelink = "http://pfam.sanger.ac.uk/family/{0}".format(acc)
+							labellink = "http://pfam.sanger.ac.uk/family/{0}".format(acc)
 							if self.source=='uniprot':
 								numberlink = "http://www.uniprot.org/blast/?about={0}[{1}-{2}]".format(self.accession, start, end)
 						
-							hit = HmmerHit(	name=name, desc=desc, acc=acc,bitscore=bitscore,labelink=labelink, numberlink=numberlink,
+							hit = HmmerHit(	name=name, desc=desc, acc=acc,bitscore=bitscore,labellink=labellink, numberlink=numberlink,
 											evalue=evalue, ievalue=ievalue, cevalue=cevalue, start=start, end=end)
 							self.features['domain'].append(hit)
 
@@ -209,10 +210,14 @@ class Hmmer(object):
 						desc = line[181:202]
 						evalue = splited[6]
 						name = splited[0]
-						labelink = "http://pfam.sanger.ac.uk/family/{0}".format(acc)
-						positionlink = "http://www.uniprot.org/blast/?about={0}[{1}-{2}]".format(self.accession, start, end)
-						hit = HmmerHit(	name=name, desc=desc, acc=acc,bitscore=bitscore,labelink=labelink, numberlink=positionlink,
-										evalue=evalue, ievalue=ievalue, cevalue=cevalue, start=start, end=end)
+						labellink = "http://pfam.sanger.ac.uk/family/{0}".format(acc)
+						if self.source == "uniprot":
+							positionlink = "http://www.uniprot.org/blast/?about={0}[{1}-{2}]".format(self.accession, start, end)
+							hit = HmmerHit(	name=name, desc=desc, acc=acc,bitscore=bitscore,labellink=labellink, numberlink=positionlink,
+											evalue=evalue, ievalue=ievalue, cevalue=cevalue, start=start, end=end)
+						else:
+							hit = HmmerHit(	name=name, desc=desc, acc=acc,bitscore=bitscore,labellink=labellink,
+											evalue=evalue, ievalue=ievalue, cevalue=cevalue, start=start, end=end)
 						self.features['domain'].append(hit)
 
 			self.exclude()			
@@ -346,12 +351,15 @@ class HmmerScanRunner(object):
 			uniprot.readFile(hmmerResult.file)
 			hmmerResult.features['uniprot'] = uniprot.hits
 			hmmerResult.tier[3]='UniProt'
-			phmmer = PhmmerSearch(tier=4,)
+			phmmer = PhmmerSearch(tier=4)
 			phmmer.readFile(hmmerResult.file)
 			hmmerResult.features['PDB']=phmmer.hits
 			hmmerResult.tier[4]='PDB'
-			
-
+			psipred = PsipredAnnotation(file=hmmerResult.file,tier=5)
+			results = psipred.psipredReader()
+			if results:
+				hmmerResult.features['SS']=psipred.hits
+				hmmerResult.tier[5]='SS'
 
 		return
 	def run(self):
@@ -384,6 +392,7 @@ class HmmerScanRunner(object):
 			else:	
 				if hmmer.runRemote():
 					self.hmmerResults.append(hmmer)
+
 		if len(self.hmmerResults)>0:
 			self.processHmmerResults()
 			self.loadAnnotation()
