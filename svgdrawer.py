@@ -382,17 +382,7 @@ class SVGDrawer(object):
                             defs.append(gradient)
         return defs
 
-    def singleSVG(
-        self,
-        hmmer,
-        doc,
-        x,
-        y,
-        leftMargin,
-        fontSize,
-        conversion,
-        boxHeight,
-        ):
+    def singleSVG(self, hmmer, doc, x, y, leftMargin, fontSize, conversion, boxHeight):
 
             # Draw Protein Text
 
@@ -441,16 +431,16 @@ class SVGDrawer(object):
 
          # Start and End Amino Acid Number
 
-        start = ET.Element('text', x=str(leftMargin - fontSize),
-                           y=str(y), fill='black',
-                           style='font-family:Sans-Serif;font-size:13px;text-anchor:right;dominant-baseline:middle'
+        start = ET.Element('text', x=str(leftMargin - fontSize), y=str(y), 
+                            fill='black', 
+                            style='font-family:Sans-Serif;font-size:13px;text-anchor:right;dominant-baseline:middle'
                            )
         start.text = '1'
         doc.append(start)
-        end = ET.Element('text', x=str(leftMargin + int(hmmer.length
-                         * conversion)), y=str(y), fill='black',
-                         style='font-family:Sans-Serif;font-size:13px;text-anchor:left;dominant-baseline:middle'
-                         )
+        end = ET.Element('text', x=str(leftMargin + int(hmmer.length * conversion)), y=str(y), 
+                        fill='black',
+                        style='font-family:Sans-Serif;font-size:13px;text-anchor:left;dominant-baseline:middle'
+                        )
         end.text = str(hmmer.length)
         doc.append(end)
 
@@ -459,9 +449,8 @@ class SVGDrawer(object):
          #
 
         for (tier, name) in hmmer.tier.items():
-            tierLabel = ET.Element('text', x=str(0), y=str(int(y
-                                   + boxHeight * 0.3 + boxHeight
-                                   * tier)), fill='black',
+            tierLabel = ET.Element('text', x=str(0), y=str(int(y + boxHeight * 0.3 + boxHeight * tier)), 
+                                   fill='black',
                                    style='font-family:Sans-Serif;font-size:13px;text-anchor:right;dominant-baseline:middle'
                                    )
             tierLabel.text = name

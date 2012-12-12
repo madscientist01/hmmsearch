@@ -32,14 +32,7 @@ from psipred import PsipredAnnotation
 
 class SmartRedirectHandler(urllib2.HTTPRedirectHandler):
 
-    def http_error_302(
-        self,
-        req,
-        fp,
-        code,
-        msg,
-        headers,
-        ):
+    def http_error_302(self, req, fp, code, msg, headers):
         return headers
 
 
@@ -206,9 +199,9 @@ class Hmmer(object):
 
     def parseHmmerScanXML(self, result):
         """
-............Parse Hmmerscan XML output into 
+        Parse Hmmerscan XML output into 
 
-............"""
+        """
 
         root = ET.fromstring(result)
         for child in root.iter('hits'):
@@ -252,9 +245,9 @@ class Hmmer(object):
 
     def runLocal(self):
 
-        #
-        # Using Hmmscan in locally installed Hmmer3 packages, find locations of domains in the Fasta sequence and store
-        #
+        """
+        Using Hmmscan in locally installed Hmmer3 packages, find locations of domains in the Fasta sequence and store
+        """
 
         if os.path.exists(self.db):
             outputFile = self.file + '.tb'

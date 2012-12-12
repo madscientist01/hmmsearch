@@ -14,24 +14,10 @@ import os
 
 class SmartRedirectHandler(urllib2.HTTPRedirectHandler):
 
-    def http_error_301(
-        self,
-        req,
-        fp,
-        code,
-        msg,
-        headers,
-        ):
+    def http_error_301(self, req, fp, code, msg, headers):
         return headers
 
-    def http_error_302(
-        self,
-        req,
-        fp,
-        code,
-        msg,
-        headers,
-        ):
+    def http_error_302(self, req, fp, code, msg, headers):
         return headers
 
 
@@ -61,9 +47,8 @@ class miscAnnotation(object):
 
     def parseAnnotation(self, result):
         """
-........Parse using ElementTree Modules (http://docs.python.org/2/library/xml.etree.elementtree.html)
-........"""
-
+        Parse using ElementTree Modules (http://docs.python.org/2/library/xml.etree.elementtree.html)
+        """
         extractRegex = re.compile('var sequence = (.*);')
         match = extractRegex.search(result)
         if match:
@@ -74,8 +59,7 @@ class miscAnnotation(object):
                 for motif in motifs:
                     desc = 'feature'
                     hit = HmmerHit(name=self.method, desc=desc,
-                                   start=motif['start'], end=motif['end'
-                                   ])
+                                   start=motif['start'], end=motif['end'])
                     hit.border = False
                     hit.startshow = False
                     hit.endshow = False
@@ -90,7 +74,6 @@ class miscAnnotation(object):
         """
 ........Hmmer Misc Annotation Reader Class
 ........"""
-
         if self.sequence and len(self.sequence) > 0:
             filename = self.file + '_{0}.xml'.format(self.method)
             if os.path.exists(filename):
@@ -141,9 +124,7 @@ class miscAnnotation(object):
 
                 result = data.read()
 
-                self.name = '{0} Prediction:'.format(self.method) \
-                    + self.name
-
+                self.name = '{0} Prediction:'.format(self.method) + self.name
                 if result:
                     f = open(filename, 'w')
                     f.write(result)
