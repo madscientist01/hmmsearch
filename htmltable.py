@@ -1,15 +1,19 @@
 #!/usr/bin/python
+# -*- coding: utf-8 -*-
+
 #
 # Simple HTML Table Generator
 #
 # Written by Madscientist (http://madscientist.wordpress.com, https://github.com/madscientist01/)
 #
 
+
 class HTMLTable(object):
 
-	def __init__(self,**kwargs):
+    def __init__(self, **kwargs):
 
-		self.htmlHeader = """
+        self.htmlHeader = \
+            """
 <!DOCTYPE html>
 <html>
 	<head>
@@ -18,7 +22,8 @@ class HTMLTable(object):
 	</head>
 	<script type="text/javascript" charset="utf8" src="{0}"></script>
 """
-		self.include = """
+        self.include = \
+            """
 		<!-- DataTables CSS -->
 		<link rel="stylesheet" type="text/css" href="http://ajax.aspnetcdn.com/ajax/jquery.dataTables/1.9.4/css/jquery.dataTables.css">
 	 
@@ -27,18 +32,21 @@ class HTMLTable(object):
 	 
 		<!-- DataTables -->
 		<script type="text/javascript" charset="utf8" src="http://ajax.aspnetcdn.com/ajax/jquery.dataTables/1.9.4/jquery.dataTables.min.js"></script>
-"""	
-		self.scriptheader = """
+"""
+        self.scriptheader = \
+            """
 		<script>
 		$(document).ready(function(){
 			$('#listtable').dataTable();
+
 """
-		self.scriptfooter = """ 		
+        self.scriptfooter = """ 		
 		});
 		</script>
 """
-		self.scriptcontent = ""
-		self.style = """
+        self.scriptcontent = ''
+        self.style = \
+            """
 		<style>
 		table{
 		    font-family: "Arial",Sans-Serif;
@@ -60,36 +68,40 @@ class HTMLTable(object):
 			}
 		div {
 			margin: 0px 0px 0px 0px
-		}		
+		}
+		
 		</style>
 		<body>
 """
-		self.tablefooter = "</table>"
-		self.htmlfooter = "</body></html>"
-		self.tableContentTemplate = ""
-		self.tableContent=""
-		self.tableHeader=""
-		self.extra=""
-		self.header = kwargs.get('header')
-		self.colNo = len(self.header)
-		self.tableHeaderGenerate()
+        self.tablefooter = '</table>'
+        self.htmlfooter = '</body></html>'
+        self.tableContentTemplate = ''
+        self.tableContent = ''
+        self.tableHeader = ''
+        self.extra = ''
+        self.header = kwargs.get('header')
+        self.colNo = len(self.header)
+        self.tableHeaderGenerate()
 
-	def tableHeaderGenerate(self):
-		self.tableHeader = "<br><br><table id='listtable'><thead><tr>" +\
-						''.join(["<td>"+i+"</td>" for i in self.header])+\
-						"</tr></thead><tbody>"	
-		self.tableContentTemplate =	"<tr>"+\
-					''.join(["<td>{"+str(i)+"}</td>" for i in range(self.colNo)])+\
-					"</tr>"
+    def tableHeaderGenerate(self):
+        self.tableHeader = "<br><br><table id='listtable'><thead><tr>" \
+            + ''.join(['<td>' + i + '</td>' for i in self.header]) \
+            + '</tr></thead><tbody>'
+        self.tableContentTemplate = '<tr>' + ''.join(['<td>{' + str(i)
+                + '}</td>' for i in range(self.colNo)]) + '</tr>'
 
-	def tableContentFill(self,tableContent):
-		fill = self.tableContentTemplate.format(*tableContent)
-		self.tableContent = self.tableContent+fill
+    def tableContentFill(self, tableContent):
+        fill = self.tableContentTemplate.format(*tableContent)
+        self.tableContent = self.tableContent + fill
+
+    def tableGenerate(self, filename):
+        table = self.htmlHeader + self.include + self.scriptheader \
+            + self.scriptcontent + self.scriptfooter + self.style \
+            + self.tableHeader + self.tableContent + self.tablefooter \
+            + self.extra + self.htmlfooter
+        f = open(filename, 'w')
+        f.write(table)
+        f.close()
+        return ()
 
 
-	def tableGenerate(self,filename):
-		table = self.htmlHeader+self.include+self.scriptheader+self.scriptcontent+self.scriptfooter+self.style+self.tableHeader+self.tableContent+self.tablefooter+self.extra+self.htmlfooter
-		f = open(filename,'w')
-		f.write(table)
-		f.close()
-		return()
