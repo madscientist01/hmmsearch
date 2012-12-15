@@ -66,6 +66,7 @@ class Hmmer(object):
         self.cutoff = kwargs.get('evalue')
         self.localHmmDB = kwargs.get('localHmmDB')
         self.threshold = kwargs.get('threshold')
+        self.overwrite = kwargs.get('overwrite')
         fasta = readFasta(self.file)
         if fasta:
             (self.name, self.sequence) = fasta
@@ -126,7 +127,7 @@ class Hmmer(object):
         # Using Hmmscan in Hmmer3 web service, find locations of domains in the Fasta sequence and store into class
         #
 
-        if os.path.exists(self.file + '.xml'):
+        if os.path.exists(self.file + '.xml') and not self.overwrite:
             print '{0} is already processed. Skipped.'.format(self.file
                     + '.xml')
             f = open(self.file + '.xml')
@@ -359,6 +360,7 @@ class HmmerScanRunner(object):
         self.scaleFactor = kwargs.get('scaleFactor', 1.5)
         self.hmmerResults = []
         self.titlemode = kwargs.get('titlemode', False)
+        self.overwrite = kwargs.get('overwrite')
 
     def processHmmerResults(self):
 
@@ -572,7 +574,7 @@ class HmmerScanRunner(object):
 
                 for hmmerResult in self.hmmerResults:
                     for (tier, hits) in hmmerResult.features.items():
-                        for hit in hmmerResult.hits:
+                        for hit in hits:
                             if hit.name == colorDef.domainName \
                                 and colorDef.color in colors:
                                 hit.color = colorDef.color
@@ -592,20 +594,20 @@ class HmmerScanRunner(object):
 
         for hmmerResult in self.hmmerResults:
             disorder = miscAnnotation(method='disorder', tier=1,
-                    color='grey')
+                    color='grey',overwrite=self.overwrite)
             disorder.readFile(hmmerResult.file)
             hmmerResult.features['disorder'] = disorder.hits
             hmmerResult.tier[1] = 'Disorder'
-            coils = miscAnnotation(method='coils', tier=2, color='green'
-                                   )
+            coils = miscAnnotation(method='coils', tier=2, color='green',
+                                    overwrite=self.overwrite)
             coils.readFile(hmmerResult.file)
             hmmerResult.features['coils'] = coils.hits
             hmmerResult.tier[2] = 'Coiled-coil'
-            uniprot = UniprotAnnotation(tier=3)
+            uniprot = UniprotAnnotation(tier=3,overwrite=self.overwrite)
             uniprot.readFile(hmmerResult.file)
             hmmerResult.features['uniprot'] = uniprot.hits
             hmmerResult.tier[3] = 'UniProt'
-            phmmer = PhmmerSearch(tier=4)
+            phmmer = PhmmerSearch(tier=4,overwrite=self.overwrite)
             phmmer.readFile(hmmerResult.file)
             hmmerResult.features['PDB'] = phmmer.hits
             hmmerResult.tier[4] = 'PDB'
@@ -641,7 +643,7 @@ class HmmerScanRunner(object):
 
         for file in files:
             hmmer = Hmmer(file=file, db=self.db, evalue=self.evalue,
-                          threshold=threshold)
+                          threshold=threshold,overwrite=self.overwrite)
             if self.local:
                 if hmmer.runLocal():
                     self.hmmerResults.append(hmmer)
@@ -755,7 +757,14 @@ if __name__ == '__main__':
         action='store_false',
         default=True,
         help='Turn of Pfam gathering threshold. Enable to look up more weak(unreliable) domains'
-            ,
+        )
+    parser.add_argument(
+        '-w',
+        '--overwrite',
+        dest='overwrite',
+        action='store_true',
+        default=False,
+        help='overwrite existing results'
         )
     parser.add_argument('-i', '--input_file', dest='inputFileName',
                         default='hmmer.INP',
@@ -772,6 +781,7 @@ if __name__ == '__main__':
         outputHTML=results.outputHTML,
         outputSVG=results.outputSVG,
         threshold=results.threshold,
+        overwrite=results.overwrite
         )
     hmmerscan.run()
 

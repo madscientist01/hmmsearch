@@ -35,6 +35,7 @@ class miscAnnotation(object):
         self.tier = kwargs.get('tier')
         self.hits = []
         self.color = kwargs.get('color')
+        self.overwrite = kwargs.get('overwrite')
 
     def readFile(self, fileName):
         (self.name, self.sequence) = readFasta(fileName)
@@ -76,7 +77,7 @@ class miscAnnotation(object):
 ........"""
         if self.sequence and len(self.sequence) > 0:
             filename = self.file + '_{0}.xml'.format(self.method)
-            if os.path.exists(filename):
+            if os.path.exists(filename) and not self.overwrite:
                 print '{0} is already processed. Skipped.'.format(filename)
                 f = open(filename)
                 read = f.readlines()

@@ -50,6 +50,8 @@ class PhmmerSearch(object):
         self.accession = kwargs.get('accession')
         self.cutoff = kwargs.get('evalue', 1e-5)
         self.length = kwargs.get('length')
+        self.overwrite = kwargs.get('overwrite')
+      
         self.species = kwargs.get('species')
         self.db = kwargs.get('db', 'pdb')
         self.tier = kwargs.get('tier')
@@ -157,7 +159,7 @@ class PhmmerSearch(object):
 ........"""
 
         filename = self.file + '_pdb_phmmer.xml'
-        if os.path.exists(filename):
+        if os.path.exists(filename) and not self.overwrite:
             print '{0} is already processed. Skipped.'.format(filename)
             f = open(filename)
             read = f.readlines()

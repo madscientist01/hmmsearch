@@ -39,6 +39,7 @@ class UniprotAnnotation(object):
         self.accession = kwargs.get('accession')
         self.length = kwargs.get('length')
         self.tier = kwargs.get('tier')
+        self.overwrite = kwargs.get('overwrite')
         self.hits = []
 
     def readFile(self, fileName):
@@ -116,7 +117,7 @@ class UniprotAnnotation(object):
     def uniprotXMLReader(self, uniprotId):
 
         fileName = uniprotId + '_uniprotAno.xml'
-        if os.path.exists(fileName):
+        if os.path.exists(fileName) and not self.overwrite:
             print '{0} is already processed. Skipped.'.format(fileName)
             f = open(fileName)
             read = f.readlines()
