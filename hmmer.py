@@ -8,25 +8,21 @@
 #
 
 from __future__ import division
-import urllib
-import urllib2
-from urllib2 import HTTPError
 import os
-import xml.etree.cElementTree as ET
 import argparse
 import glob
-import sys
-import subprocess
 from hmmerhit import HmmerHit
 from htmltable import HTMLTable
 from inputfile import InputFile
-from fetchutil import readFasta, readAccession
 from svgdrawer import SVGDrawer
 from annotation import miscAnnotation
 from uniprotannotation import UniprotAnnotation
 from phmmer import PhmmerSearch
 from psipred import PsipredAnnotation
 from hmmscan import Hmmer
+import SimpleHTTPServer
+import SocketServer
+import webbrowser
 
 class SVGList(object):
 
@@ -36,7 +32,7 @@ class SVGList(object):
         self.footer = '<br>'
         self.svgEmbeddingTemplate = \
             """
-<div class="domain" id="{0}">{1}</div><div class="sequence">{2}</div>
+<div class="span12 scrollable domain" id="{0}">{1}</div><div class="span12 scrollable sequence">{2}</div>
 """
         self.svgEmbedContent = ''
 
@@ -65,9 +61,7 @@ class HmmerScanRunner(object):
 
     def processHmmerResults(self):
 
-    '''
-    inject information of input file into hmmerResults
-    '''
+        # inject information of input file into hmmerResults
         if self.inputFile:
             colors = [
                 'aliceblue',
@@ -365,6 +359,89 @@ class HmmerScanRunner(object):
             (svgFileNames, svgContent) = draw.drawMultiSVG()
             header = ['Accession', 'Name', 'Domain', 'length']
             table = HTMLTable(header=header)
+            table.scriptcontent="""           
+                    $('#listtable').dataTable({
+                        "sDom": "<'row'<'span8'l>r>t<'row'<'span8'i><'span8'p>>",
+                         "iDisplayLength": 50,
+                         "aoColumnDefs": [
+                         { "sWidth": "100px", "aTargets": [ 0 ] },
+                         { "sWidth": "400px", "aTargets": [ 1 ] },
+                         { "sWidth": "400px", "aTargets": [ 2 ] },
+                         { "sWidth": "100px", "aTargets": [ 3 ] },
+                                         
+                         ]                                    
+                        });
+            """
+            table.style ="""                  
+                <style>
+                table{
+                    font-family: "Arial",Sans-Serif;
+                    font-size: 12px;
+                    margin: 40px;
+                    width:1000px;
+                    text-align: left;
+                    border-collapse: collapse;  
+                    }
+                tr.conditionalRowColor
+                {
+                    border-left:2px;
+                    border-left-color:red;
+                    border-right:2px; 
+                    border-right-color:red;
+                    border-top:2px;
+                    border-top-color:red;
+                    border-bottom:2px 
+                    border-botton-color:red;
+                }
+                    
+                 td.conditionalRowColor
+                {
+                    background-color:#FFEEEE;
+                }
+
+                .scrollable {
+                height: 100%;
+                overflow: auto;
+                }
+                div.head {
+                    width:800px;
+                    font-family: Sans-Serif;
+                    font-size: 14px;
+                    border:3px solid #EEEEEE;
+                    border-radius: 10px;
+                    padding: 10px;
+                    align :center;
+                    background-color: #FFFFFF;
+                    }
+               div.dataTables_length label {
+                    width: 460px;
+                    float: left;
+                    text-align: left;
+                }
+                 
+                div.dataTables_length select {
+                    width: 75px;
+                }
+                 
+                div.dataTables_filter label {
+                    float: right;
+                    width: 460px;
+                }
+                 
+                div.dataTables_info {
+                    padding-top: 8px;
+                }
+                 
+                div.dataTables_paginate {
+                    float: right;
+                    margin: 0;
+                }
+                 
+                table {
+                    clear: both;
+                } 
+                </style>
+            """
             svgList = SVGList()
 
             for hmmerResult in self.hmmerResults:
@@ -387,12 +464,10 @@ class HmmerScanRunner(object):
                     nameLink = ''
 
                 domain = []
-
                 #
                 # Table formation
                 # Todo : Template Engine
                 #
-
                 for hit in hmmerResult.features['domain']:
                     if hit.acc:
                         domainName = \
@@ -417,8 +492,15 @@ class HmmerScanRunner(object):
                         svgContent[hmmerResult.name],
                         sequenceContent[hmmerResult.name]])
             svg = svgList.svgEmbedContent
-            table.extra = '<br><div>' + svg + '</div>'
+            table.extra = '<br><div class="span12 scrollable">' + svg + '</div>'
             table.tableGenerate(self.outputHTML)
+            PORT=8000
+            linkFormat = 'http://localhost:'+str(PORT)+'/{0}'
+            Handler = SimpleHTTPServer.SimpleHTTPRequestHandler
+            httpd = SocketServer.TCPServer(("", PORT), Handler)
+            print "serving at port", PORT
+            webbrowser.open(linkFormat.format(self.outputHTML))
+            httpd.serve_forever()
 
 
 if __name__ == '__main__':
