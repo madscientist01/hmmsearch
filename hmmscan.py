@@ -14,7 +14,7 @@ import xml.etree.cElementTree as ET
 import sys
 import subprocess
 from hmmerhit import HmmerHit
-from fetchutil import readFasta, readAccession
+from abstractsequenceobject import AbstractSequenceObject
 
 # install a custom handler to prevent following of redirects automatically.
 
@@ -23,35 +23,20 @@ class SmartRedirectHandler(urllib2.HTTPRedirectHandler):
     def http_error_302(self, req, fp, code, msg, headers):
         return headers
 
-class Hmmer(object):
+class Hmmer(AbstractSequenceObject):
 
     '''
-....Hmmscan wrapper class
-....'''
+    Hmmscan wrapper class
+    '''
 
     def __init__(self, **kwargs):
 
-        self.file = kwargs.get('file')
-        self.db = kwargs.get('db')
+        super(Hmmer, self).__init__(**kwargs)
         self.cutoff = kwargs.get('evalue',0.01)
         self.localHmmDB = kwargs.get('localHmmDB')
         self.threshold = kwargs.get('threshold')
         self.overwrite = kwargs.get('overwrite')
         self.excludeRedundancy = kwargs.get('excludeRedundancy',True)
-        fasta = readFasta(self.file)
-        if fasta:
-            (self.name, self.sequence) = fasta
-        else:
-            self.name = None
-            self.sequence = None
-        accession = readAccession(self.file)
-        if accession:
-            (self.source, self.accession) = accession
-        else:
-            self.source = None
-            self.accession = None
-        self.length = len(self.sequence)
-        self.features = {}
         hits = []
         self.features['domain'] = hits
         self.tier = {}
