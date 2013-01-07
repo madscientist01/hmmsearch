@@ -15,7 +15,6 @@ import sys
 import subprocess
 from hmmerhit import HmmerHit
 from abstractsequenceobject import AbstractSequenceObject
-
 # install a custom handler to prevent following of redirects automatically.
 
 class SmartRedirectHandler(urllib2.HTTPRedirectHandler):
@@ -47,35 +46,23 @@ class Hmmer(AbstractSequenceObject):
         #
         # Exclude overlapped domain. If two domains are overlapped, the one have higher bitscore will be retained
         #
+        hits = self.features['domain']
 
-        if len(self.features['domain']) > 1:
-            for i in range(len(self.features['domain']) - 1):
-                for j in range(i + 1, len(self.features['domain'])):
-                    if not self.features['domain'][i].exclude \
-                        and not self.features['domain'][j].exclude:
-                        if self.features['domain'][i].end \
-                            > self.features['domain'][j].start \
-                            and self.features['domain'][i].end \
-                            < self.features['domain'][j].end:
-                            if self.features['domain'][i].bitscore \
-                                > self.features['domain'][j].bitscore:
-                                self.features['domain'][j].exclude = \
-                                    True
+        if len(hits) > 1:
+            for i in range(len(hits) - 1):
+                for j in range(i + 1, len(hits)):
+                    if not hits[i].exclude and not hits[j].exclude:
+                        if hits[i].end > hits[j].start and hits[i].end < hits[j].end:
+                            if hits[i].score > hits[j].score:
+                                hits[j].exclude = True
                             else:
-                                self.features['domain'][i].exclude = \
-                                    True
+                                hits[i].exclude =True                  
 
-                        if self.features['domain'][j].end \
-                            > self.features['domain'][i].start \
-                            and self.features['domain'][j].end \
-                            < self.features['domain'][i].end:
-                            if self.features['domain'][i].bitscore \
-                                > self.features['domain'][j].bitscore:
-                                self.features['domain'][j].exclude = \
-                                    True
+                        if hits[j].end > hits[i].start and hits[j].end < hits[i].end:
+                            if hits[i].score > hits[j].score :
+                                hits[j].exclude = True
                             else:
-                                self.features['domain'][i].exclude = \
-                                    True
+                                hits[i].exclude = True
 
     def runRemote(self):
 
@@ -112,14 +99,10 @@ class Hmmer(AbstractSequenceObject):
                 request = \
                     urllib2.Request('http://hmmer.janelia.org/search/hmmscan'
                                     , enc_params)
-
                 # get the url where the results can be fetched from
-
                 results_url = \
                     urllib2.urlopen(request).getheader('location')
-
                 # modify the range, format and presence of alignments in your results here
-
                 res_params = {'output': 'xml'}
 
                 # add the parameters to your request for the results
@@ -256,6 +239,7 @@ class Hmmer(AbstractSequenceObject):
                         desc = line[descriptionLocation:]
                         evalue = splited[6]
                         name = splited[0]
+                        query=splited[3]
                         labellink = \
                             'http://pfam.sanger.ac.uk/family/{0}'.format(acc)
                         if self.source == 'uniprot':
@@ -274,6 +258,7 @@ class Hmmer(AbstractSequenceObject):
                                 cevalue=cevalue,
                                 start=start,
                                 end=end,
+                                query=query
                                 )
                         else:
                             hit = HmmerHit(
